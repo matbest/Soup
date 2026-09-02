@@ -2,9 +2,10 @@ import { hashMd, coords } from './soup.js';
 
 // Canvas grid. Colour is a function of the genome hash, so identical genomes share a
 // colour and any mutation shows up as a new one. Empty cells are near-black.
-export function createView(canvas, getSoup, { onSelect }) {
+export function createView(canvas, getSoup, { onSelect, getActive = () => null }) {
   let selected = null;
   const ctx = canvas.getContext('2d');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function colour(md) {
     if (md === null) return '#101214';
@@ -42,6 +43,29 @@ export function createView(canvas, getSoup, { onSelect }) {
       ctx.lineWidth = 2;
       ctx.strokeRect(ox + x * cell + 1, oy + y * cell + 1, cell - gap - 2, cell - gap - 2);
     }
+    const active = getActive();
+    if (active !== null && active < soup.cells.length) {
+      const [x, y] = coords(soup, active);
+      drawWorking(ox + x * cell + (cell - gap) / 2, oy + y * cell + (cell - gap) / 2, (cell - gap) * 0.28);
+    }
+  }
+
+  // The cell whose turn is at the model: a turning arc, or a still ring under
+  // prefers-reduced-motion.
+  function drawWorking(cx, cy, r) {
+    ctx.save();
+    ctx.strokeStyle = '#f2ede4';
+    ctx.lineWidth = Math.max(2, r / 3.5);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (reducedMotion) {
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    } else {
+      const t = (performance.now() / 700) * Math.PI * 2;
+      ctx.arc(cx, cy, r, t, t + Math.PI * 1.4);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
 
   canvas.addEventListener('click', e => {

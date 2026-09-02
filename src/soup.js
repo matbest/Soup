@@ -46,6 +46,10 @@ export function place(soup, x, y, md, { gen = 0 } = {}) {
   return c;
 }
 
+export function clear(soup, x, y) {
+  Object.assign(at(soup, x, y), emptyCell());
+}
+
 export function occupiedIndices(soup) {
   const out = [];
   for (let i = 0; i < soup.cells.length; i++) if (soup.cells[i].md !== null) out.push(i);

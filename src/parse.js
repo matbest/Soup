@@ -1,27 +1,33 @@
-// The instruction set. One instruction:
+import { DIRS } from './soup.js';
+
+// The instruction set, as a JSON schema. It is handed to the model as a grammar
+// (constrained decoding), so every completion is a syntactically valid instruction:
+// Tierra's property that every bit pattern is an opcode. Two instructions:
 //
-//   WRITE <N|E|S|W>
-//   <text>
-//   END
+//   {"action":"copy",  "dir":D}             copy this cell's genome into neighbour D
+//   {"action":"write", "dir":D, "text":T}   write the text T into neighbour D
 //
-// The first WRITE line opens the block; the LAST bare END line closes it, so a genome may
-// mention END in prose without terminating its own copy early. One write per turn.
-// Returns null when there is no complete block, including when the slice ran out before
-// END, which is how a too-long genome fails to reproduce.
-export function parseWrite(text) {
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
-  let start = -1, dir = null;
-  for (let i = 0; i < lines.length; i++) {
-    const m = /^\s*WRITE\s+([NESW])\s*$/.exec(lines[i]);
-    if (m) { start = i; dir = m[1]; break; }
-  }
-  if (start < 0) return null;
-  let end = -1;
-  for (let i = lines.length - 1; i > start; i--) {
-    if (/^\s*END\s*$/.test(lines[i])) { end = i; break; }
-  }
-  if (end < 0) return null;
-  const md = lines.slice(start + 1, end).join('\n').trim();
-  if (!md) return null;
-  return { dir, md };
+// Parsing here is the fallback for engines that cannot be constrained (the mock), and
+// for outputs cut off by the slice, which is how an over-long write fails.
+export const ACTIONS = ['copy', 'write'];
+
+export const ACTION_SCHEMA = JSON.stringify({
+  type: 'object',
+  properties: {
+    action: { type: 'string', enum: ACTIONS },
+    dir: { type: 'string', enum: Object.keys(DIRS) },
+    text: { type: 'string' },
+  },
+  required: ['action', 'dir'],
+});
+
+export function parseAction(text) {
+  const a = text.indexOf('{'), b = text.lastIndexOf('}');
+  if (a < 0 || b < a) return null;
+  let o;
+  try { o = JSON.parse(text.slice(a, b + 1)); } catch { return null; }
+  if (!o || typeof o !== 'object') return null;
+  if (!ACTIONS.includes(o.action) || !(o.dir in DIRS)) return null;
+  if (o.action === 'write') return { action: 'write', dir: o.dir, text: typeof o.text === 'string' ? o.text.trim() : '' };
+  return { action: 'copy', dir: o.dir };
 }
