@@ -38,9 +38,11 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
     lastUsage: null,
     get raw() { return engine; },
     gpu: null,
+    lost: null,   // reason, once the GPU device has gone
     async load() {
       if (!navigator.gpu) throw new Error('WebGPU is not available in this browser');
       self.gpu = await describeAdapter();
+      watchDevice(reason => { self.lost = reason; onProgress?.(`GPU device lost: ${reason}`); console.error('[soup] GPU device lost:', reason); });
       const webllm = await import(WEBLLM_URL);
       try {
         engine = await webllm.CreateMLCEngine(modelId, {
@@ -74,15 +76,16 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       };
       let r;
       try {
+        if (self.lost) throw new Error(`the GPU device was lost (${self.lost}); reload the page`);
         r = await engine.chat.completions.create(request);
       } catch (err) {
-        // WebLLM keeps one grammar matcher per loaded model and, if a turn throws between
-        // freeing the old matcher and making the new one, keeps pointing at the freed
-        // object: every later constrained turn then fails with "deleted object". There
-        // is no call to clear it short of reloading the model, so do that (weights are
-        // cached) and retry once.
-        if (!/deleted object|GrammarMatcher/i.test(err?.message ?? String(err))) throw err;
-        console.warn('[soup] grammar matcher was freed; reloading the model and retrying', err);
+        const msg = err?.message ?? String(err);
+        if (self.lost) throw new Error(`the GPU device was lost (${self.lost}); reload the page`);
+        // "Deleted", "disposed", "already deleted": something WebLLM holds was freed under
+        // it. Short of a device loss (handled above) there is no call to clear it except
+        // reloading the model, so do that (weights are cached) and retry once.
+        if (!/deleted|disposed|GrammarMatcher/i.test(msg)) throw err;
+        console.warn('[soup] engine state was freed under it; reloading the model and retrying', err);
         onProgress?.('recovering: reloading the model');
         await engine.reload(modelId);
         onProgress?.(modelId);
@@ -95,6 +98,17 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
     },
   };
   return self;
+}
+
+// Hold a small device of our own on the adapter and watch it. A driver reset or a power
+// event loses every device on the adapter at once, so ours going is a reliable sign that
+// WebLLM's has gone too, and the page can say so instead of failing on the next call.
+async function watchDevice(onLost) {
+  try {
+    const a = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+    const d = await a?.requestDevice();
+    d?.lost.then(info => onLost(`${info.reason || 'unknown'}${info.message ? `: ${info.message}` : ''}`));
+  } catch { /* nothing to watch */ }
 }
 
 // Which GPU WebGPU hands us. WebLLM asks for "high-performance" itself; on a dual-GPU
