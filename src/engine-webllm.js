@@ -39,9 +39,18 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
     name: modelId,
     instant: false,
     lastUsage: null,
+    prefillRate: null,     // tokens a second, measured, once a turn has run
+    tighten: 1,            // doubles each time this machine loses its device
     get raw() { return engine; },
     gpu: null,
     lost: null,   // why the GPU device has gone, once it has
+
+    // How much prompt this card can carry inside `seconds`, from what it has actually
+    // managed so far. Halved again after each device loss: the machine has just shown
+    // that the estimate was too generous.
+    promptCap(seconds) {
+      return promptCapFor(self.prefillRate, seconds) / self.tighten;
+    },
     async load() {
       if (!navigator.gpu) throw new Error('WebGPU is not available in this browser');
       self.gpu = await describeAdapter();
@@ -116,12 +125,18 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
         // tokenizer, a tensor. The console line naming the real cause may not have
         // arrived yet, so treat these as the same event and let the page rebuild.
         if (/deleted|disposed/i.test(err?.message ?? String(err))) {
+          self.tighten = Math.min(self.tighten * 2, 8);
           self.lost = 'the GPU device was lost (the runtime found its objects freed).';
           throw gaveUp();
         }
         throw err;
       }
       self.lastUsage = r.usage ?? null;
+      // How fast this machine actually is. Windows resets a GPU whose work runs past two
+      // seconds, and prefill is one piece of work, so this is what decides how much
+      // prompt a visitor's card can be given.
+      const rate = r.usage?.extra?.prefill_tokens_per_s;
+      if (rate > 0) self.prefillRate = self.prefillRate ? self.prefillRate * 0.7 + rate * 0.3 : rate;
       const text = r.choices?.[0]?.message?.content ?? '';
       // Belt and braces: never return more than the slice, whatever the model says.
       return text.slice(0, charBudget(maxTokens) * 2);
@@ -148,6 +163,13 @@ function captureGpuErrors(onError) {
       }
     }
   };
+}
+
+// How many prompt tokens a machine can prefill inside `seconds`. Until a turn has been
+// timed it assumes a slow card, because guessing high is what gets the device reset while
+// guessing low only costs a shorter genome.
+export function promptCapFor(rate, seconds) {
+  return Math.max(40, Math.floor((rate ?? 100) * seconds));
 }
 
 // Which GPU WebGPU hands us. WebLLM asks for "high-performance" itself; on a dual-GPU

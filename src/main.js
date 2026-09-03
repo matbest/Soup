@@ -1,5 +1,5 @@
 import { createSoup, place, stats, snapshot, restore, population, coords } from './soup.js';
-import { createScheduler, prompt } from './scheduler.js';
+import { createScheduler, prompt, promptWindow } from './scheduler.js';
 import * as toolset from './tools.js';
 const { setTools } = toolset;
 import { createMockEngine } from './engine-mock.js';
@@ -15,7 +15,7 @@ const $ = id => document.getElementById(id);
 
 // Copy noise is the mutation rate, and at zero there is no evolution: every copy is
 // exact, so nothing varies and nothing can be selected. It is on by default.
-const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, rpm: 10, animMs: 55, showText: true, steps: 1 };
+const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, rpm: 10, safeSeconds: 1.2, animMs: 55, showText: true, steps: 1 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -255,15 +255,17 @@ const escape = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 // The prompt, with the part that fits the turn budget in white and anything past it in
 // red. The red is the tail the model never sees: the turn still happens, on what fits.
 function renderPrompt(text) {
-  const allowed = opts.budget > 0 ? Math.max(0, opts.budget - opts.maxTokens) : Infinity;
-  const cut = allowed === Infinity ? text.length : allowed * CHARS_PER_TOKEN;
+  const allowed = promptWindow(engine, opts);
+  const cut = allowed === Infinity ? text.length : Math.floor(allowed) * CHARS_PER_TOKEN;
   const used = estimateTokens(text);
   $('prompt').innerHTML = cut >= text.length
     ? escape(text)
     : `${escape(text.slice(0, cut))}<span class="over">${escape(text.slice(cut))}</span>`;
   $('prompt-head').textContent = allowed === Infinity
     ? `sent to the model — ${used} tokens, no limit set`
-    : `sent to the model — ${used} of ${allowed} tokens${used > allowed ? `, the last ${used - allowed} are not sent` : ''}`;
+    : `sent to the model — ${used} of ${Math.floor(allowed)} tokens` +
+      (used > allowed ? `, the last ${used - Math.floor(allowed)} are not sent` : '') +
+      (engine?.prefillRate ? `  (this machine prefills ${Math.round(engine.prefillRate)}/s)` : '');
 }
 
 function showTab(name) {

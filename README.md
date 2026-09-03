@@ -211,6 +211,25 @@ Hence two switches that look like fussiness and are not:
 - `webllm`: a small instruct model over WebGPU, loaded in the page and cached by the
   browser. Qwen2.5-0.5B is the working floor; the status line shows which GPU it got.
 
+### The window fits the machine
+
+A visitor cannot be asked to change a registry key before a web page will work, so the
+page measures instead. WebLLM reports how many tokens a second it managed to prefill;
+prefill is one GPU dispatch, and Windows resets a card whose dispatch runs past two
+seconds. So the prompt window is whichever is smaller: the turn budget, or what this
+particular machine can prefill in 1.2 seconds. Until a turn has been timed it assumes a
+slow card — guessing high is what loses the device, guessing low only costs a shorter
+genome — and each device loss halves the estimate again.
+
+    not yet measured        120 tokens
+    a T1000 at 99/s         118 tokens
+    a quicker iGPU at 400/s 480 tokens
+    a desktop card          900 tokens, the budget rather than the card
+    after two device losses  29 tokens
+
+A hosted model has no watchdog, so only the budget applies. The cell tab shows the window
+and the measured rate.
+
 ### On a slow card
 
 Prefill is one GPU dispatch, and Windows resets the card if a dispatch runs past two

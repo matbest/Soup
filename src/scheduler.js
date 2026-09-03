@@ -117,7 +117,7 @@ export function createScheduler(soup, engine, opts) {
     // a turn, but a genome longer than the window has a tail the model never sees. Where
     // the keys sit in a file therefore starts to matter, and prefill — one GPU dispatch,
     // whose duration grows with the prompt — cannot grow without limit.
-    const messages = viPrompt(clip(cell.md, opts.budget, opts.maxTokens));
+    const messages = viPrompt(clip(cell.md, promptWindow(engine, opts)));
     const truncated = messages[1].content.length < cell.md.length;
     active = i;
     let out;
@@ -154,11 +154,21 @@ export function createScheduler(soup, engine, opts) {
 
 export { viPrompt };
 
-// As much of a cell's text as the turn budget will carry. Cutting mid-line is deliberate:
-// a window ends where it ends.
-export function clip(md, budget, maxTokens) {
-  const allowed = budget > 0 ? Math.max(0, budget - maxTokens) : Infinity;
-  return allowed === Infinity ? md : md.slice(0, allowed * CHARS_PER_TOKEN);
+// How much prompt a turn may carry: the turn budget, and — for a model running on the
+// visitor's own GPU — however much that GPU can prefill inside the watchdog's patience.
+// Whichever is smaller. A local engine reports how fast it turned out to be, so the window
+// fits whatever machine the page is open on, and nobody has to change a system setting to
+// keep their display driver alive.
+export function promptWindow(engine, opts) {
+  const fromBudget = opts.budget > 0 ? Math.max(0, opts.budget - opts.maxTokens) : Infinity;
+  const fromCard = engine?.promptCap ? engine.promptCap(opts.safeSeconds ?? 1.2) : Infinity;
+  return Math.min(fromBudget, fromCard);
+}
+
+// As much of a cell's text as the window will carry. Cutting mid-line is deliberate: a
+// window ends where it ends.
+export function clip(md, allowed) {
+  return allowed === Infinity ? md : md.slice(0, Math.floor(allowed) * CHARS_PER_TOKEN);
 }
 
 // What a cell's turn starts from: its own text, then the TOOLS. Nothing else.
