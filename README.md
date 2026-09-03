@@ -260,6 +260,9 @@ grow: paste-over leaves several copies of the instruction in a cell, which makes
 keystrokes easier for the model to find — a more robust representation of the same
 program, arrived at by selection rather than design.
 
+Hovering a cell on the grid shows what is in it and what the model said when it last ran,
+without leaving the run tab. Clicking one opens the same thing in full on the cell tab.
+
 The **vi** tab is a bench for trying it by hand: a window of the grid around the cursor,
 the keystroke stream shown key by key (click any key to run up to that point), Step and
 Back, presets, and a box to type straight in. *Apply as new start* takes the result as the

@@ -20,6 +20,7 @@ let inFlight = null;   // the turn currently awaiting the model, if any
 
 const view = createView($('grid'), () => soup, {
   onSelect: i => { showCell(i); showTab('cell'); },
+  onHover: showTip,
   getActive: () => (sched ? sched.active : null),
 });
 
@@ -144,6 +145,44 @@ function showCell(i) {
 }
 
 let viLab = null;
+
+// What is in a cell, and what the model said when it last ran, without leaving the grid.
+function showTip(i, mx, my) {
+  const tip = $('tip');
+  if (i === null || !soup) { tip.hidden = true; return; }
+  const c = soup.cells[i];
+  const [x, y] = coords(soup, i);
+  if (c.md === null) {
+    tip.innerHTML = `<span class="tip-head">(${x}, ${y})  empty</span>`;
+  } else {
+    const ev = c.last;
+    const parts = [
+      `<span class="tip-head">(${x}, ${y})  gen ${c.gen}  born t${c.born}  turns ${c.turns}  fails ${c.fails}  ${c.md.length} chars</span>`,
+      escape(clip(c.md, 700)),
+    ];
+    if (ev) {
+      const reply = ev.mode === 'vi' ? (ev.rounds?.[0]?.out ?? '') : (ev.rounds?.[ev.rounds.length - 1]?.out ?? '');
+      parts.push(
+        '<span class="tip-rule">' + '─'.repeat(40) + '</span>',
+        `<span class="tip-head">${escape(describe(ev))}${usageText(ev.usage)}</span>`,
+        escape(clip(reply, 500)) || '<span class="tip-head">(empty reply)</span>',
+      );
+    } else {
+      parts.push('<span class="tip-head">has not taken a turn yet</span>');
+    }
+    tip.innerHTML = parts.join('\n');
+  }
+  tip.hidden = false;
+  // Keep it on screen: flip to the other side of the pointer near an edge.
+  const r = tip.getBoundingClientRect();
+  const left = mx + 16 + r.width > window.innerWidth ? Math.max(4, mx - 16 - r.width) : mx + 16;
+  const top = my + 12 + r.height > window.innerHeight ? Math.max(4, window.innerHeight - r.height - 4) : my + 12;
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
+}
+
+const clip = (t, n) => (t.length > n ? t.slice(0, n) + '\n…' : t);
+const escape = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 function showTab(name) {
   for (const b of document.querySelectorAll('nav [role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === name));

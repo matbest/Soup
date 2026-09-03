@@ -2,7 +2,7 @@ import { hashMd, coords } from './soup.js';
 
 // Canvas grid. Colour is a function of the genome hash, so identical genomes share a
 // colour and any mutation shows up as a new one. Empty cells are near-black.
-export function createView(canvas, getSoup, { onSelect, getActive = () => null }) {
+export function createView(canvas, getSoup, { onSelect, onHover = () => {}, getActive = () => null }) {
   let selected = null;
   const ctx = canvas.getContext('2d');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -68,14 +68,24 @@ export function createView(canvas, getSoup, { onSelect, getActive = () => null }
     ctx.restore();
   }
 
-  canvas.addEventListener('click', e => {
+  // Which cell is under the pointer, or null if the pointer is off the grid.
+  function cellAt(e) {
     const soup = getSoup();
     const { cell, ox, oy } = layout();
     const r = canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - r.left - ox) / cell);
     const y = Math.floor((e.clientY - r.top - oy) / cell);
-    if (x < 0 || y < 0 || x >= soup.w || y >= soup.h) return;
-    selected = y * soup.w + x;
+    if (x < 0 || y < 0 || x >= soup.w || y >= soup.h) return null;
+    return y * soup.w + x;
+  }
+
+  canvas.addEventListener('mousemove', e => onHover(cellAt(e), e.clientX, e.clientY));
+  canvas.addEventListener('mouseleave', () => onHover(null));
+
+  canvas.addEventListener('click', e => {
+    const i = cellAt(e);
+    if (i === null) return;
+    selected = i;
     onSelect(selected);
     draw();
   });

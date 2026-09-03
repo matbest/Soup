@@ -43,6 +43,12 @@
   .genome { background: #101214; border: 1px solid #23262a; padding: 4px; margin-bottom: 3px; cursor: pointer; color: #e6e1d6; }
   .genome:hover { border-color: #6b8f84; }
   details summary { cursor: pointer; color: #8fa39b; }
+  #tip { position: fixed; z-index: 20; max-width: 460px; max-height: 70vh; overflow: hidden;
+         background: #0e1113; border: 1px solid #3d4a46; padding: 6px 8px; pointer-events: none;
+         white-space: pre-wrap; word-break: break-word; color: #e6e1d6; box-shadow: 0 4px 14px #000a; }
+  #tip[hidden] { display: none !important; }
+  #tip .tip-head { color: #8fa39b; }
+  #tip .tip-rule { color: #3d4a46; }
   #vi-panel { position: fixed; inset: 0; background: #0a0b0c; padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: auto; z-index: 10; }
   #vi-panel[hidden] { display: none !important; }
   #vi-panel header { display: flex; flex-direction: column; gap: 6px; }
@@ -71,6 +77,7 @@
 <body>
 <main>
   <div class="stage"><canvas id="grid"></canvas></div>
+  <div id="tip" hidden></div>
   <aside>
     <h1>Soup <span id="status"></span></h1>
     <div id="gpu"></div>
