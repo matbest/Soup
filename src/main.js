@@ -1,7 +1,7 @@
 import { createSoup, place, stats, snapshot, coords } from './soup.js';
 import { createScheduler } from './scheduler.js';
 import { createMockEngine } from './engine-mock.js';
-import { createWebLLMEngine, MODELS } from './engine-webllm.js';
+import { createWebLLMEngine, MODELS, describeAdapter } from './engine-webllm.js';
 import { createView } from './view.js';
 import { estimateTokens } from './tokens.js';
 
@@ -30,6 +30,7 @@ async function makeEngine(name) {
     return e;
   } catch (err) {
     $('status').textContent = `${e.name}: ${err.message}`;
+    console.error('[soup] engine load failed', e.name, err);
     $('engine').value = 'mock';
     return createMockEngine();
   } finally {
@@ -172,6 +173,7 @@ async function init() {
     $('engine').appendChild(o);
   }
   $('ancestor').value = (await (await fetch('./ancestor.md')).text()).trim();
+  $('gpu').textContent = navigator.gpu ? `gpu: ${await describeAdapter()}` : 'gpu: WebGPU not available in this browser';
   bind('temperature', 'temperature');
   bind('slice', 'maxTokens');
   bind('noise', 'noise');

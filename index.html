@@ -28,6 +28,7 @@
   #probe-v { align-self: center; color: #8fa39b; }
   #genome { width: 100%; height: 150px; font: inherit; background: #101214; color: #e6e1d6; border: 1px solid #23262a; padding: 6px; resize: vertical; }
   #output { max-height: 220px; overflow: auto; background: #101214; border: 1px solid #23262a; padding: 6px; }
+  #gpu { color: #8fa39b; margin-top: -8px; }
   #status { color: #8fa39b; font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 8px; }
   @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } .stage { max-height: none; width: 100%; } }
 </style>
@@ -37,6 +38,7 @@
   <div class="stage"><canvas id="grid"></canvas></div>
   <aside>
     <h1>Soup <span id="status"></span></h1>
+    <div id="gpu"></div>
     <fieldset>
       <legend>run</legend>
       <div class="row">

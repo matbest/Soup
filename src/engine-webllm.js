@@ -59,12 +59,14 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
 // Which GPU WebGPU hands us. WebLLM asks for "high-performance" itself; on a dual-GPU
 // laptop whether that reaches the discrete card is decided by the OS and the browser,
 // not by the page, so the best the page can do is say which one it got.
-async function describeAdapter() {
+export async function describeAdapter() {
   try {
     const a = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
     if (!a) return 'no adapter';
     const i = a.info || (a.requestAdapterInfo ? await a.requestAdapterInfo() : {});
-    return [i.vendor, i.architecture, i.device, i.description].filter(Boolean).join(' ') || 'unknown adapter';
+    const name = [i.vendor, i.architecture, i.device, i.description].filter(Boolean).join(' ') || 'unknown adapter';
+    console.log('[soup] WebGPU adapter:', name, i);
+    return name;
   } catch {
     return 'unknown adapter';
   }
