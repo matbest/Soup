@@ -303,6 +303,11 @@ in the replay as in the turn that is finally applied — what is watched is what
 The **animate** dial is milliseconds between commands, 0 for no replay, and **cell text**
 turns the writing in the cells off.
 
+The cell tab's *sent to the model* panel draws the prompt in white up to what the turn
+budget allows and in red beyond it, with the count in the heading. The red is not text
+that gets truncated — the whole turn is refused and the cell cannot act — so it marks
+where a genome stopped being able to afford itself.
+
 Hovering a cell on the grid shows what is in it and what the model said when it last ran,
 without leaving the run tab. Clicking one opens the same thing in full on the cell tab.
 

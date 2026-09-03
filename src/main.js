@@ -9,7 +9,7 @@ import { createView } from './view.js';
 import { createViLab } from './vi-lab.js';
 import { viPrompt, viPreview } from './vi-soup.js';
 import { seeded, tokenize } from './vi.js';
-import { estimateTokens } from './tokens.js';
+import { estimateTokens, CHARS_PER_TOKEN } from './tokens.js';
 
 const $ = id => document.getElementById(id);
 
@@ -188,14 +188,14 @@ function transcript(ev) {
 
 // The cell tab: the text, what its last turn did, and (folded) what the model was sent.
 function showCell(i) {
-  const clear = head => { $('cell-head').textContent = head; $('prompt').textContent = ''; $('genome').textContent = ''; $('output').textContent = ''; };
+  const clear = head => { $('cell-head').textContent = head; $('prompt').innerHTML = ''; $('genome').textContent = ''; $('output').textContent = ''; };
   if (i === null) { clear('click a cell on the grid'); return; }
   const c = soup.cells[i];
   const [x, y] = coords(soup, i);
   if (c.md === null) { clear(`(${x}, ${y}) empty`); return; }
   $('cell-head').textContent = `(${x}, ${y})  gen ${c.gen}  born t${c.born}  turns ${c.turns}  fails ${c.fails}  ${c.md.length} chars, about ${estimateTokens(c.md)} tokens`;
   $('genome').textContent = c.md;
-  $('prompt').textContent = (opts.mode === 'vi' ? viPrompt : prompt)(c.md)[1].content;
+  renderPrompt((opts.mode === 'vi' ? viPrompt : prompt)(c.md)[1].content);
   const ev = c.last;
   $('output').textContent = ev ? describe(ev) + usageText(ev.usage) + '\n\n' + transcript(ev) : 'has not taken a turn yet';
 }
@@ -244,6 +244,21 @@ function showTip(i, mx, my) {
 const clip = (t, n) => (t.length > n ? t.slice(0, n) + '\n…' : t);
 const escape = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
+// The prompt, with the part that fits the turn budget in white and anything past it in
+// red. What is past it is not sent short — the whole turn is refused, and the cell cannot
+// act at all — so the red is where a genome stopped being able to afford itself.
+function renderPrompt(text) {
+  const allowed = opts.budget > 0 ? Math.max(0, opts.budget - opts.maxTokens) : Infinity;
+  const cut = allowed === Infinity ? text.length : allowed * CHARS_PER_TOKEN;
+  const used = estimateTokens(text);
+  $('prompt').innerHTML = cut >= text.length
+    ? escape(text)
+    : `${escape(text.slice(0, cut))}<span class="over">${escape(text.slice(cut))}</span>`;
+  $('prompt-head').textContent = allowed === Infinity
+    ? `sent to the model — ${used} tokens, no limit set`
+    : `sent to the model — ${used} of ${allowed} tokens${used > allowed ? `, ${used - allowed} too many: this cell cannot act` : ''}`;
+}
+
 function showTab(name) {
   for (const b of document.querySelectorAll('nav [role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
   for (const p of document.querySelectorAll('.panel')) p.hidden = p.dataset.panel !== name;
@@ -280,7 +295,7 @@ async function probe() {
     $('probe-v').textContent = `${n} write${n === 1 ? '' : 's'}, ${ev.rounds.length} round${ev.rounds.length === 1 ? '' : 's'}, ${secs}s`;
     $('cell-head').textContent = `probe${usageText(ev.usage)}  ${secs}s`;
     $('genome').textContent = md;
-    $('prompt').textContent = (opts.mode === 'vi' ? viPrompt : prompt)(md)[1].content;
+    renderPrompt((opts.mode === 'vi' ? viPrompt : prompt)(md)[1].content);
     $('output').textContent = describe(ev) + '\n\n' + transcript(ev);
     showTab('cell');
   } finally {

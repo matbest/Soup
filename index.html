@@ -52,6 +52,7 @@
   #tip[hidden] { display: none !important; }
   #tip .tip-head { color: #8fa39b; }
   #tip .tip-rule { color: #3d4a46; }
+  #prompt .over { color: #e0705a; }
   #vi-panel { position: fixed; inset: 0; background: #0a0b0c; padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: auto; z-index: 10; }
   #vi-panel[hidden] { display: none !important; }
   #vi-panel header { display: flex; flex-direction: column; gap: 6px; }
@@ -143,7 +144,7 @@
         <pre id="output" class="box"></pre>
       </fieldset>
       <details>
-        <summary>sent to the model (the text, then TOOLS)</summary>
+        <summary id="prompt-head">sent to the model</summary>
         <pre id="prompt" class="box"></pre>
       </details>
     </section>
