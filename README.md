@@ -220,6 +220,17 @@ over and over. What it learns is kept in the browser, per model, so reloading th
 starts from the measured rate and the tightened window rather than relearning them by
 losing the device again.
 
+### Not running the fans off
+
+A local model runs turn after turn with nothing between them, which on a laptop means the
+GPU is held at full tilt for as long as the run lasts. The **rest** dial idles for that
+percentage of however long each turn took — proportional rather than a fixed delay, so it
+means the same thing on a fast machine as a slow one. At 15% the card is idle roughly a
+seventh of the time and the soup takes about a seventh longer. Nothing else changes.
+
+The animation is idle time too: while a turn is being replayed on the grid, the GPU is
+doing nothing.
+
 ### Carrying on by itself
 
 Add `?resume=1` and a run looks after itself overnight. A device loss is rebuilt in place;

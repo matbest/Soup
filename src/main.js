@@ -15,7 +15,7 @@ const $ = id => document.getElementById(id);
 
 // Copy noise is the mutation rate, and at zero there is no evolution: every copy is
 // exact, so nothing varies and nothing can be selected. It is on by default.
-const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, rpm: 10, safeSeconds: 1.2, animMs: 55, showText: true, steps: 1 };
+const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, rpm: 10, rest: 15, safeSeconds: 1.2, animMs: 55, showText: true, steps: 1 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -332,11 +332,20 @@ async function probe() {
 // tab keeps running (throttled, but alive).
 const yieldToBrowser = () => new Promise(r => setTimeout(r, 0));
 
+// Idle for a share of however long the work took, so a laptop is not held at full tilt
+// for hours. It costs a percentage of the throughput and nothing else.
+function breathe(workedMs) {
+  const share = Math.max(0, opts.rest) / 100;
+  return share > 0 && workedMs > 0 ? new Promise(r => setTimeout(r, workedMs * share)) : Promise.resolve();
+}
+
 async function loop() {
   while (running) {
+    let sweptFor = 0;
     // A slow engine draws every turn; an instant one would spend all its time drawing.
     const per = engine.instant ? Math.max(20, opts.steps) : 1;
     for (let k = 0; k < per && running; k++) {
+      const startedAt = performance.now();
       inFlight = sched.step();
       view.draw();   // show the working mark now, even where animation frames are paused
       let ev;
@@ -365,11 +374,13 @@ async function loop() {
         break;
       }
       if (!ev) { running = false; $('status').textContent = 'soup is dead'; break; }
+      sweptFor += performance.now() - startedAt;
     }
     view.draw();
     showStats();
     if (view.selected !== null) showCell(view.selected);
     if (soup.tick - lastSaveTick >= 20) { lastSaveTick = soup.tick; save(); }
+    await breathe(sweptFor);
     await yieldToBrowser();
   }
   save();
@@ -498,6 +509,7 @@ async function init() {
   bind('keyLimit', 'keyLimit');
   bind('allowance', 'allowance');
   bind('rpm', 'rpm');
+  bind('rest', 'rest');
   bind('animMs', 'animMs');
   $('showText').checked = opts.showText;
   $('showText').addEventListener('change', () => { opts.showText = $('showText').checked; view.draw(); });
@@ -523,6 +535,7 @@ async function init() {
     try {
       for (let k = 0; k < want; k++) {
         $('step').textContent = want > 1 ? `Step ${k + 1}/${want}` : 'Step';
+        const stepStartedAt = performance.now();
         inFlight = sched.step();
         view.draw();
         const ev = await inFlight.finally(() => { inFlight = null; });
@@ -530,6 +543,7 @@ async function init() {
         showStats();
         if (!ev) { $('status').textContent = 'soup is dead'; break; }
         view.select(ev.y * soup.w + ev.x);
+        await breathe(performance.now() - stepStartedAt);
       }
       save();
     } catch (err) {
