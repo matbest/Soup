@@ -158,27 +158,31 @@ function showTip(i, mx, my) {
     const ev = c.last;
     const parts = [
       `<span class="tip-head">(${x}, ${y})  gen ${c.gen}  born t${c.born}  turns ${c.turns}  fails ${c.fails}  ${c.md.length} chars</span>`,
-      escape(clip(c.md, 700)),
+      escape(clip(c.md, 260)),
     ];
     if (ev) {
       const reply = ev.mode === 'vi' ? (ev.rounds?.[0]?.out ?? '') : (ev.rounds?.[ev.rounds.length - 1]?.out ?? '');
       parts.push(
         '<span class="tip-rule">' + '─'.repeat(40) + '</span>',
         `<span class="tip-head">${escape(describe(ev))}${usageText(ev.usage)}</span>`,
-        escape(clip(reply, 500)) || '<span class="tip-head">(empty reply)</span>',
+        escape(clip(reply, 200)) || '<span class="tip-head">(empty reply)</span>',
       );
     } else {
       parts.push('<span class="tip-head">has not taken a turn yet</span>');
     }
     tip.innerHTML = parts.join('\n');
   }
+  // Pinned to the right edge, over the sidebar, never over the grid: a panel that follows
+  // the pointer covers the thing being looked at, and because it ignores the pointer the
+  // cells underneath still respond, which reads as the grid having gone black.
   tip.hidden = false;
-  // Keep it on screen: flip to the other side of the pointer near an edge.
   const r = tip.getBoundingClientRect();
-  const left = mx + 16 + r.width > window.innerWidth ? Math.max(4, mx - 16 - r.width) : mx + 16;
-  const top = my + 12 + r.height > window.innerHeight ? Math.max(4, window.innerHeight - r.height - 4) : my + 12;
-  tip.style.left = `${left}px`;
-  tip.style.top = `${top}px`;
+  const pad = 6;
+  const vw = Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0, r.width + 2 * pad);
+  const vh = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0, r.height + 2 * pad);
+  // Clamped so the result can never be negative, whatever the viewport reports.
+  tip.style.left = `${Math.max(pad, vw - r.width - pad)}px`;
+  tip.style.top = `${Math.max(pad, Math.min(my - r.height / 2, vh - r.height - pad))}px`;
 }
 
 const clip = (t, n) => (t.length > n ? t.slice(0, n) + '\n…' : t);
