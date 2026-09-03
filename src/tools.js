@@ -65,7 +65,7 @@ export const WRITE_SCHEMA = reply({
 // Shown after every cell's text, verbatim. Two sizes, because prefill is one GPU dispatch
 // and its cost scales with prompt length: on a small card a long prompt can run past the
 // Windows watchdog limit and get the device reset. `short` is the same nine tools in a
-// third of the tokens.
+// third of the tokens, and is the default.
 export const TOOLS_FULL = [
   'TOOLS',
   'Reply with one JSON object: {"thoughts": "...", "calls": [ ... ]}. Thoughts are optional.',
@@ -97,10 +97,10 @@ export const TOOLS_SHORT = [
   '{"tool":"delete_file","path":"east"}',
 ].join('\n');
 
-export let TOOLS = TOOLS_FULL;
+export let TOOLS = TOOLS_SHORT;
 
 export function setTools(which) {
-  TOOLS = which === 'short' ? TOOLS_SHORT : TOOLS_FULL;
+  TOOLS = which === 'full' ? TOOLS_FULL : TOOLS_SHORT;
   return TOOLS;
 }
 

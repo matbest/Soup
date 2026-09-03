@@ -221,8 +221,9 @@ async function init() {
   }
   $('engine').value = wanted || DEFAULT_MODEL;
   $('ancestor').value = (await (await fetch('./ancestor.md')).text()).trim();
-  // ?tools=short sends a third as many prompt tokens. Prefill is one GPU dispatch, and on
-  // a small card a long prompt can run past the Windows watchdog and get the device reset.
+  // Short TOOLS is the default: prefill is one GPU dispatch, and on a small card a long
+  // prompt can run past the Windows watchdog and get the device reset. ?tools=full sends
+  // the verbose block instead.
   $('manual').textContent = setTools(new URL(location.href).searchParams.get('tools'));
   for (const b of document.querySelectorAll('nav [role=tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
   $('gpu').textContent = navigator.gpu ? `gpu: ${await describeAdapter()}` : 'gpu: WebGPU not available in this browser';

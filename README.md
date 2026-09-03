@@ -89,6 +89,35 @@ per-round price, overwrite as death.
 key with slots for observation. Both were built and replaced the same week; the file-tool
 shape is the one the models were trained on.)
 
+## What runs, and why
+
+The model has to be big enough to use the tools and small enough not to hang the GPU, and
+on a 4 GB laptop card those two constraints nearly meet.
+
+- **Llama-3.2-1B** with the short TOOLS block is the default, and reproduces: ten minutes
+  of continuous running on a Quadro T1000 with no driver resets, 1.9 GB resident, clocks
+  at P3 throughout.
+- **Qwen2.5-1.5B and up** trip the Windows GPU watchdog (TDR) on that card. Prefill is one
+  dispatch, its duration scales with prompt length, and past two seconds Windows decides
+  the card has hung and resets it. Everything the runtime holds is then freed, so the next
+  call fails with whatever it touches first — `GrammarMatcher instance already deleted`,
+  `Tokenizer instance already deleted`, `Object has already been disposed`. Four messages,
+  one cause: `DXGI_ERROR_DEVICE_HUNG` in the browser console, and event 4101 in the
+  Windows system log. Raising `TdrDelay` to 10 seconds is the fix if you want the bigger
+  models; nothing in this repo can work around it.
+- **SmolLM2-360M and below** never trip it, and write Python instead of tool calls.
+
+Hence two switches that look like fussiness and are not:
+
+- **Short TOOLS** (`?tools=full` for the verbose one) halves the prompt, which roughly
+  halves the prefill dispatch. This is the difference between running and not.
+- **Grammar** (constrained decoding, on by default) is what makes a 1B model act at all.
+  Without it, it narrates what it would do in prose and the turn does nothing. The token
+  masking is CPU-side and costs no GPU time. It was removed once, blamed for the watchdog
+  errors above; that was wrong.
+
+`?engine=<model id>` selects any model WebLLM knows, in or out of the picker.
+
 ## Engines
 
 - `mock`: no GPU. Behaves as a well-tuned ancestor should: copies into an empty

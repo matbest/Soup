@@ -27,8 +27,11 @@ export const MODELS = [
 
 export const vramOf = id => MODELS.find(m => m.id === id)?.vram;
 
-// The smallest model that reads its document rather than guessing at it.
-export const DEFAULT_MODEL = 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
+// The largest model that reproduces reliably without tripping the Windows GPU watchdog on
+// a small discrete card. Bigger ones are better agents but their prefill dispatch can run
+// past the 2-second limit, at which point the card is reset and everything here dies with
+// it. See the README.
+export const DEFAULT_MODEL = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
 
 export function createWebLLMEngine(modelId, { onProgress } = {}) {
   let engine = null;
