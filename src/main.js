@@ -1,4 +1,4 @@
-import { createSoup, place, stats, snapshot, restore, coords } from './soup.js';
+import { createSoup, place, stats, snapshot, restore, population, coords } from './soup.js';
 import { createScheduler, prompt } from './scheduler.js';
 import * as toolset from './tools.js';
 const { setTools } = toolset;
@@ -10,7 +10,9 @@ import { estimateTokens } from './tokens.js';
 
 const $ = id => document.getElementById(id);
 
-const opts = { maxTokens: 300, temperature: 0.7, noise: 0, rounds: 4, grammar: true, budget: 1200, readLimit: 600, ticksPerFrame: 20 };
+// Copy noise is the mutation rate, and at zero there is no evolution: every copy is
+// exact, so nothing varies and nothing can be selected. It is on by default.
+const opts = { maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, ticksPerFrame: 20 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -66,6 +68,25 @@ function showStats() {
     `occupied ${s.occupied}/${s.total}   genomes ${s.distinct}   dominant ${s.dominant}\n` +
     `mean length ${s.meanLen.toFixed(0)} chars, about ${Math.ceil(s.meanLen / 4)} tokens\n` +
     `fail rate ${(s.failRate * 100).toFixed(1)}%`;
+  showPopulation();
+}
+
+// What is persisting, and what it says. Click one to seed the ancestor from it.
+function showPopulation() {
+  $('pop').innerHTML = '';
+  for (const g of population(soup)) {
+    const el = document.createElement('pre');
+    el.className = 'genome';
+    el.title = g.md;
+    el.textContent = `${String(g.n).padStart(3)} cells  gen ${g.maxGen}  since t${g.oldest}  ${g.md.length}c\n     ${firstLine(g.md)}`;
+    el.addEventListener('click', () => { $('ancestor').value = g.md; showTab('setup'); });
+    $('pop').appendChild(el);
+  }
+}
+
+function firstLine(md) {
+  const line = md.split('\n').map(l => l.trim()).find(Boolean) || '(blank)';
+  return line.length > 64 ? line.slice(0, 64) + '\u2026' : line;
 }
 
 function usageText(u) {
@@ -266,6 +287,7 @@ async function init() {
   bind('slice', 'maxTokens');
   bind('noise', 'noise');
   bind('rounds', 'rounds');
+  bind('calls', 'calls');
   bind('budget', 'budget');
   $('grammar').checked = opts.grammar;
   $('grammar').addEventListener('change', () => { opts.grammar = $('grammar').checked; });

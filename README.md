@@ -72,7 +72,20 @@ within the turn.
 **Death.** `copy_file` and `create_file` over an occupied path replace it. `delete_file`
 empties it. A file can also be edited down to nothing. No reaper.
 
-**Mutation.** Host noise on `copy_file`, per character, at a rate you set. Plus whatever a
+**Mutation.** Host noise on `copy_file`, per character, at a rate you set, and **on by
+default**: at zero every copy is exact, nothing varies, and nothing can be selected. A
+copy is where variation enters, and the instruction string is what varies.
+
+**What to watch.** The population panel lists the distinct texts in the soup by how many
+cells carry them, how long they have been there and how deep their lineage runs. That is
+the experiment: a wording that reliably gets the model to copy it spreads, a wording that
+gets the model to delete its own children does not, and neither outcome is anybody's
+design. Click a genome to load it into the ancestor box and seed a fresh soup from it.
+
+**Calls per round** is a dial. At 1 a round is one decision. Higher, and a cell can act
+several times at once — which is how a small model shown a list of nine tools comes to
+recite all nine, ending with `delete_file`. Whether that is a failure to prevent or a
+pressure to select on is the question the dial leaves open. Plus whatever a
 cell writes into itself or its neighbours.
 
 **Everything else as v1:** torus, one cell per tick in a shuffled sweep, the slice as the

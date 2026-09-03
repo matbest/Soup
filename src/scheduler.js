@@ -3,8 +3,7 @@ import { estimateTokens } from './tokens.js';
 import * as tools from './tools.js';
 const { READS, parseReply, runCall, renderResults } = tools;
 
-const SCHEMA = JSON.stringify(tools.REPLY_SCHEMA);
-const WRITE_ONLY = JSON.stringify(tools.WRITE_SCHEMA);
+const schemaFor = (writeOnly, n) => JSON.stringify(writeOnly ? tools.writeSchema(n) : tools.replySchema(n));
 
 // Tierra's slicer, minus the reaper. Sweeps every occupied cell once in a random order,
 // one cell per tick, then reshuffles. `opts` is read live so the UI can change it mid-run.
@@ -52,7 +51,7 @@ export function createScheduler(soup, engine, opts) {
         try {
           // Under the grammar the reply cannot be malformed. Without it, a reply the parser
           // cannot read is a turn that does nothing, and was paid for.
-          out = await engine.complete({ messages, schema: opts.grammar ? (writeOnly ? WRITE_ONLY : SCHEMA) : null, maxTokens: opts.maxTokens, temperature: opts.temperature });
+          out = await engine.complete({ messages, schema: opts.grammar ? schemaFor(writeOnly, Math.max(1, opts.calls ?? 1)) : null, maxTokens: opts.maxTokens, temperature: opts.temperature });
         } finally {
           active = null;
         }

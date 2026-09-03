@@ -107,6 +107,21 @@ export function restore(data) {
   return soup;
 }
 
+// The population by distinct text: how many cells carry it, how long it has been in the
+// soup, and how many generations deep. This is the thing to watch — what persists.
+export function population(soup, top = 6) {
+  const groups = new Map();
+  for (const c of soup.cells) {
+    if (c.md === null) continue;
+    const g = groups.get(c.md) || { md: c.md, n: 0, oldest: Infinity, maxGen: 0 };
+    g.n++;
+    g.oldest = Math.min(g.oldest, c.born);
+    g.maxGen = Math.max(g.maxGen, c.gen);
+    groups.set(c.md, g);
+  }
+  return [...groups.values()].sort((a, b) => b.n - a.n || a.oldest - b.oldest).slice(0, top);
+}
+
 export function snapshot(soup) {
   return JSON.stringify({
     w: soup.w, h: soup.h, tick: soup.tick, sweep: soup.sweep,

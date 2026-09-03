@@ -50,21 +50,23 @@ export const CALL_SCHEMA = {
 // nine in order: it is completing the pattern of the manual rather than choosing, and in
 // testing that made a copy and then deleted it. A round is one decision; a turn still
 // gets several rounds.
-const reply = items => ({
+const reply = (items, maxItems) => ({
   type: 'object',
-  properties: { thoughts: str, calls: { type: 'array', items, minItems: 1, maxItems: 1 } },
+  properties: { thoughts: str, calls: { type: 'array', items, minItems: 1, maxItems } },
   required: ['calls'],
   additionalProperties: false,
 });
 
-export const REPLY_SCHEMA = reply(CALL_SCHEMA);
+export const replySchema = (maxItems = 1) => reply(CALL_SCHEMA, maxItems);
+export const writeSchema = (maxItems = 1) =>
+  reply({ anyOf: CALL_SCHEMA.anyOf.filter(c => !READS.has(c.properties.tool.enum[0])) }, maxItems);
+
+export const REPLY_SCHEMA = replySchema(1);
 
 // The same, minus the reads. A turn's last round uses this, so a cell that spends its
 // whole turn looking around still has to do something with what it saw. Looking is not
 // free and it is not unlimited: the slice runs out.
-export const WRITE_SCHEMA = reply({
-  anyOf: CALL_SCHEMA.anyOf.filter(c => !READS.has(c.properties.tool.enum[0])),
-});
+export const WRITE_SCHEMA = writeSchema(1);
 
 // Shown after every cell's text, verbatim. Two sizes, because prefill is one GPU dispatch
 // and its cost scales with prompt length: on a small card a long prompt can run past the
