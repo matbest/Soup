@@ -34,18 +34,49 @@ const view = createView($('grid'), () => soup, {
 // what is watched is what will happen. Nothing here alters the soup.
 async function playTurn({ x, y, keys, seed }) {
   if (!opts.animMs || !keys) return;
-  const n = tokenize(keys).length;
-  if (!n) return;
-  for (let k = 1; k <= n; k++) {
-    overlay = viPreview(soup, x, y, keys, k, seeded(seed));
+  const toks = tokenize(keys);
+  if (!toks.length) return;
+
+  let before = viPreview(soup, x, y, keys, 0, seeded(seed));
+  for (let k = 1; k <= toks.length; k++) {
+    const after = viPreview(soup, x, y, keys, k, seeded(seed));
+    // A paste puts a whole file in at once, because that is what pasting is. Letting it
+    // arrive a line at a time is decoration, not mechanism: the end state is identical
+    // and nothing here touches the soup.
+    await reveal(before, after);
+    overlay = after;
     view.draw();
-    // A pause between commands rather than between keys: gg is one thought, not two.
-    const key = tokenize(keys)[k - 1];
-    await new Promise(r => setTimeout(r, key === ' ' || key === 'CR' ? 0 : opts.animMs));
-    if (!running && !busy) break;   // stopped mid-turn
+    const key = toks[k - 1];
+    await pause(key === ' ' || key === 'CR' ? 0 : opts.animMs);
+    if (!running && !busy) break;
+    before = after;
   }
   overlay = null;
 }
+
+// Draw the step from one state to the next as the new lines landing one by one, wherever
+// a cell gained several at a stroke.
+async function reveal(before, after) {
+  if (!opts.animMs) return;
+  for (const [key, text] of after.cells) {
+    if (text === null) continue;
+    const was = before.cells.get(key) ?? null;
+    if (text === was) continue;
+    const lines = text.split('\n');
+    const had = was === null ? 0 : was.split('\n').length;
+    if (lines.length - had < 2) continue;              // a small change is just a change
+    const frames = Math.min(10, lines.length);
+    for (let f = 1; f < frames; f++) {
+      const upto = Math.max(1, Math.round((lines.length * f) / frames));
+      overlay = { ...after, cells: new Map(after.cells).set(key, lines.slice(0, upto).join('\n')) };
+      view.draw();
+      await pause(Math.max(12, opts.animMs / 3));
+      if (!running && !busy) return;
+    }
+  }
+}
+
+const pause = ms => (ms > 0 ? new Promise(r => setTimeout(r, ms)) : Promise.resolve());
 
 const ancestor = () => $('ancestor').value.trim();
 
