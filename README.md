@@ -220,6 +220,15 @@ over and over. What it learns is kept in the browser, per model, so reloading th
 starts from the measured rate and the tightened window rather than relearning them by
 losing the device again.
 
+### Carrying on by itself
+
+Add `?resume=1` and a run looks after itself overnight. A device loss is rebuilt in place;
+if the browser will not hand back an adapter at all — which happens, and which a person
+fixes by reloading the page — the page saves the soup, reloads itself, loads the soup back
+and presses Run. Five reloads at most, so a machine that simply cannot run this stops
+trying, and only a reload the page asked for resumes a soup: a fresh visit starts fresh.
+Without the flag nothing reloads on its own.
+
 ### The window fits the machine
 
 A visitor cannot be asked to change a registry key before a web page will work, so the

@@ -112,6 +112,15 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       // difference between one model resident and two.
       try { await engine?.unload(); } catch { /* its device is already gone */ }
       engine = null;
+      // The browser does not hand out a new adapter the instant the old device dies, so
+      // wait for one rather than failing on the first try.
+      for (let wait = 500; ; wait *= 2) {
+        const a = await navigator.gpu?.requestAdapter().catch(() => null);
+        if (a) break;
+        if (wait > 8000) throw new Error('the browser has no GPU left to give; the page needs reloading');
+        onProgress?.(`waiting for the GPU to come back (${(wait / 1000).toFixed(1)}s)`);
+        await new Promise(r => setTimeout(r, wait));
+      }
       self.lost = null;
       const webllm = await import(WEBLLM_URL);
       engine = await webllm.CreateMLCEngine(modelId, {

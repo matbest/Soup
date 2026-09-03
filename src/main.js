@@ -345,7 +345,13 @@ async function loop() {
       } catch (err) {
         // A GPU reset need not end the run: rebuild the engine and keep going. The soup
         // itself is untouched, only the model's device state died.
-        if (err?.deviceLost && await recoverEngine()) continue;
+        if (err?.deviceLost) {
+          const got = await recoverEngine();
+          if (got === true) continue;
+          // Stop the loop before the reload lands, or it spends every reload it is
+          // allowed in the fraction of a second before the page goes.
+          if (got === 'gave-up' && await reloadAndResume()) { running = false; break; }
+        }
         // Being rate limited is not a failure either — the run stops where it is and the
         // soup keeps its state, so it can be started again later without losing anything.
         if (err?.rateLimited) {
@@ -384,11 +390,29 @@ async function recoverEngine() {
     $('status').textContent = `${engine.name} on ${engine.gpu}  (recovered ${recoveries}x, window ${Math.floor(promptWindow(engine, opts))} tokens)`;
     return true;
   } catch (err) {
-    failed(err);
-    return false;
+    // Say why the rebuild failed, not what triggered it: the second is already known.
+    console.error('[soup] could not rebuild the model', err);
+    $('status').textContent = `could not rebuild: ${err?.message ?? err}`;
+    return 'gave-up';
   } finally {
     setBusy(false);
   }
+}
+
+// When the browser will not give the GPU back at all, the thing that works is what a
+// person does by hand: reload the page and carry on. The soup is on disk, so nothing is
+// lost. Guarded by a count, so a machine that cannot run this at all stops trying.
+const RELOADS = 'soup.reloads';
+const RESUMING = 'soup.resuming';
+async function reloadAndResume() {
+  const n = Number(sessionStorage.getItem(RELOADS) || 0);
+  if (!opts.autoReload || n >= 5 || saveBroken) return false;
+  sessionStorage.setItem(RELOADS, String(n + 1));
+  sessionStorage.setItem(RESUMING, '1');
+  $('status').textContent = 'the GPU is gone; saving and reloading to carry on';
+  await save();
+  setTimeout(() => location.reload(), 400);
+  return true;
 }
 
 // A turn that throws (the engine, the grammar, the GPU) must say so on the page, not
@@ -445,6 +469,9 @@ async function init() {
   }
   $('engine').value = wanted || DEFAULT_MODEL;
   opts.mode = new URL(location.href).searchParams.get('mode') === 'tools' ? 'tools' : 'vi';
+  // ?resume=1 gives the page leave to save, reload itself and pick the run back up when
+  // the browser will not give the GPU back at all — which is what a person does by hand.
+  opts.autoReload = new URL(location.href).searchParams.get('resume') === '1';
   $('mode').value = opts.mode;
   $('mode').addEventListener('change', async () => {
     await stop();
@@ -507,7 +534,11 @@ async function init() {
       save();
     } catch (err) {
       // A GPU reset should cost a model rebuild, not the run, whether stepping or running.
-      if (err?.deviceLost && await recoverEngine()) return;
+      if (err?.deviceLost) {
+        const got = await recoverEngine();
+        if (got === true) return;
+        if (got === 'gave-up' && await reloadAndResume()) return;
+      }
       failed(err);
     } finally {
       $('step').textContent = 'Step';
@@ -561,6 +592,17 @@ async function init() {
   });
   window.addEventListener('resize', () => view.draw());
   requestAnimationFrame(animate);
+  // Only when the page reloaded itself: a fresh visit starts a fresh soup.
+  if (sessionStorage.getItem(RESUMING) === '1') {
+    sessionStorage.removeItem(RESUMING);
+    try {
+      loadDump(await (await fetch('/runs/latest.json')).json());
+      $('status').textContent = `${engine.name} — carrying on from where the GPU gave out`;
+      $('run').click();
+    } catch { /* nothing saved to carry on from */ }
+  } else {
+    sessionStorage.removeItem(RELOADS);
+  }
 }
 
 // OpenRouter's free list changes week to week, so ask for it rather than hardcode it.
