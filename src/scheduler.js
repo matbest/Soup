@@ -1,7 +1,8 @@
 import { coords, occupiedIndices } from './soup.js';
 import { estimateTokens } from './tokens.js';
 import * as tools from './tools.js';
-import { viPrompt, viTurn } from './vi-soup.js';
+import { viPrompt, viTurn, keystrokesFrom } from './vi-soup.js';
+import { seeded } from './vi.js';
 const { READS, parseReply, runCall, renderResults } = tools;
 
 const schemaFor = (writeOnly, n) => JSON.stringify(writeOnly ? tools.writeSchema(n) : tools.replySchema(n));
@@ -125,7 +126,11 @@ export function createScheduler(soup, engine, opts) {
     soup.spent += cost;
     cell.credit -= cost;
     requeue(i);
-    const r = viTurn(soup, x, y, out, { noise: opts.noise, keyLimit: opts.keyLimit ?? 400 });
+    // The same seed for the replay and for the turn itself, so what is watched is what
+    // happens rather than a second roll of the dice.
+    const seed = (Math.random() * 0x100000000) >>> 0;
+    if (opts.onAnimate) await opts.onAnimate({ x, y, keys: keystrokesFrom(out), seed });
+    const r = viTurn(soup, x, y, out, { noise: opts.noise, keyLimit: opts.keyLimit ?? 400, rng: seeded(seed) });
     if (!r.effects.length) cell.fails++;
     const ev = {
       tick: soup.tick, x, y, mode: 'vi', keys: r.keys, keyCount: r.keyCount,

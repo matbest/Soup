@@ -105,6 +105,8 @@
         <label>instructions <select id="mode"><option value="vi">vi keystrokes</option><option value="tools">JSON tools</option></select><span></span></label>
         <label>engine <select id="engine"><optgroup label="openrouter (free)" id="or-group"></optgroup><option value="mock">mock</option></select><span></span></label>
         <label>grid <select id="size"><option>8</option><option selected>12</option><option>16</option><option>20</option><option>32</option></select><span></span></label>
+        <label>animate <input id="animMs" type="range" min="0" max="300" step="5" value="55" title="Milliseconds between vi commands as a turn plays out on the grid. 0 shows only the result."><span id="animMs-v"></span></label>
+        <label>cell text <input id="showText" type="checkbox" checked><span>in the grid</span></label>
         <label>steps <input id="steps" type="range" min="1" max="50" value="1" title="How many turns one press of Step runs"><span id="steps-v"></span></label>
       </fieldset>
       <fieldset>

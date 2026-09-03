@@ -2,7 +2,7 @@ import { hashMd, coords } from './soup.js';
 
 // Canvas grid. Colour is a function of the genome hash, so identical genomes share a
 // colour and any mutation shows up as a new one. Empty cells are near-black.
-export function createView(canvas, getSoup, { onSelect, onHover = () => {}, getActive = () => null }) {
+export function createView(canvas, getSoup, { onSelect, onHover = () => {}, getActive = () => null, getOverlay = () => null, showText = () => true }) {
   let selected = null;
   const ctx = canvas.getContext('2d');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -42,10 +42,25 @@ export function createView(canvas, getSoup, { onSelect, onHover = () => {}, getA
     ctx.fillStyle = '#0a0b0c';
     ctx.fillRect(0, 0, side, side);
     const gap = cell > 6 ? 1 : 0;
+    // While a turn plays out the overlay holds the part-finished state, so what is on
+    // screen is the edit in progress rather than the soup as it stands.
+    const overlay = getOverlay();
+    const fontPx = Math.max(3, Math.min(7, Math.floor(cell / 11)));
+    const withText = showText() && cell >= 22;
     for (let i = 0; i < soup.cells.length; i++) {
       const [x, y] = coords(soup, i);
-      ctx.fillStyle = colour(soup.cells[i].md);
-      ctx.fillRect(ox + x * cell, oy + y * cell, cell - gap, cell - gap);
+      const key = `${x},${y}`;
+      const md = overlay?.cells.has(key) ? overlay.cells.get(key) : soup.cells[i].md;
+      const px = ox + x * cell, py = oy + y * cell;
+      ctx.fillStyle = colour(md);
+      ctx.fillRect(px, py, cell - gap, cell - gap);
+      if (withText && md !== null) drawText(md, px, py, cell - gap, fontPx);
+    }
+    if (overlay) {
+      // The cell the cursor is in, so the eye can follow it from one to the next.
+      ctx.strokeStyle = '#fff6d8';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(ox + overlay.at.x * cell + 1, oy + overlay.at.y * cell + 1, cell - gap - 2, cell - gap - 2);
     }
     if (selected !== null && selected < soup.cells.length) {
       const [x, y] = coords(soup, selected);
@@ -75,6 +90,25 @@ export function createView(canvas, getSoup, { onSelect, onHover = () => {}, getA
       ctx.arc(cx, cy, r, t, t + Math.PI * 1.4);
     }
     ctx.stroke();
+    ctx.restore();
+  }
+
+  // The cell's text, small enough to be texture rather than reading matter: what a lineage
+  // looks like, and whether it is growing or being eaten away.
+  function drawText(md, px, py, size, fontPx) {
+    const pad = 2;
+    const lines = md.split('\n');
+    const room = Math.floor((size - pad) / (fontPx + 1));
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(px, py, size, size);
+    ctx.clip();
+    ctx.font = `${fontPx}px ui-monospace, monospace`;
+    ctx.fillStyle = 'rgba(10, 11, 12, 0.72)';
+    ctx.textBaseline = 'top';
+    for (let i = 0; i < Math.min(lines.length, room); i++) {
+      ctx.fillText(lines[i], px + pad, py + pad + i * (fontPx + 1));
+    }
     ctx.restore();
   }
 

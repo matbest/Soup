@@ -56,6 +56,26 @@ export function keystrokesFrom(reply) {
   return looksLikeKeys ? last : '';
 }
 
+// The state of the neighbourhood after the first `limit` keys, touching nothing. This is
+// what the grid draws while a turn plays out.
+export function viPreview(soup, x, y, keys, limit, rng) {
+  const r = run(
+    (dx, dy) => {
+      const c = at(soup, x + dx, y + dy);
+      return c.md === null ? null : { text: c.md, cursor: c.cursor };
+    },
+    keys,
+    { limit, rng },
+  );
+  const cells = new Map();
+  for (const c of r.cells.values()) {
+    const [tx, ty] = wrap(soup, x + c.dx, y + c.dy);
+    cells.set(`${tx},${ty}`, c.text);
+  }
+  const [ax, ay] = wrap(soup, x + r.at.dx, y + r.at.dy);
+  return { cells, at: { x: ax, y: ay }, mode: r.mode };
+}
+
 // Run one cell's turn. Returns what changed, for the log and the view.
 export function viTurn(soup, x, y, reply, { noise = 0, keyLimit = 400, rng = Math.random } = {}) {
   const keys = keystrokesFrom(reply);

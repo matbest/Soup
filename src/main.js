@@ -7,22 +7,45 @@ import { createWebLLMEngine, MODELS, DEFAULT_MODEL, describeAdapter } from './en
 import { createOpenRouterEngine, freeModels, storedKey, storeKey, PREFIX, PREFERRED } from './engine-openrouter.js';
 import { createView } from './view.js';
 import { createViLab } from './vi-lab.js';
-import { viPrompt } from './vi-soup.js';
+import { viPrompt, viPreview } from './vi-soup.js';
+import { seeded, tokenize } from './vi.js';
 import { estimateTokens } from './tokens.js';
 
 const $ = id => document.getElementById(id);
 
 // Copy noise is the mutation rate, and at zero there is no evolution: every copy is
 // exact, so nothing varies and nothing can be selected. It is on by default.
-const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, rpm: 10, steps: 1 };
+const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, rpm: 10, animMs: 55, showText: true, steps: 1 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
+
+let overlay = null;   // the part-finished state of a turn, while it plays out
 
 const view = createView($('grid'), () => soup, {
   onSelect: i => { showCell(i); showTab('cell'); },
   onHover: showTip,
   getActive: () => (sched ? sched.active : null),
+  getOverlay: () => overlay,
+  showText: () => opts.showText,
 });
+
+// Play a turn's keystrokes over the grid, one command at a time, before the soup is
+// changed. The replay re-runs from the start at each step with the turn's own seed, so
+// what is watched is what will happen. Nothing here alters the soup.
+async function playTurn({ x, y, keys, seed }) {
+  if (!opts.animMs || !keys) return;
+  const n = tokenize(keys).length;
+  if (!n) return;
+  for (let k = 1; k <= n; k++) {
+    overlay = viPreview(soup, x, y, keys, k, seeded(seed));
+    view.draw();
+    // A pause between commands rather than between keys: gg is one thought, not two.
+    const key = tokenize(keys)[k - 1];
+    await new Promise(r => setTimeout(r, key === ' ' || key === 'CR' ? 0 : opts.animMs));
+    if (!running && !busy) break;   // stopped mid-turn
+  }
+  overlay = null;
+}
 
 const ancestor = () => $('ancestor').value.trim();
 
@@ -57,6 +80,7 @@ function reset() {
   const n = Number($('size').value);
   soup = createSoup(n, n);
   place(soup, Math.floor(n / 2), Math.floor(n / 2), ancestor());
+  opts.onAnimate = playTurn;
   sched = createScheduler(soup, engine, opts);
   view.clear();
   view.draw();
@@ -376,6 +400,9 @@ async function init() {
   bind('keyLimit', 'keyLimit');
   bind('allowance', 'allowance');
   bind('rpm', 'rpm');
+  bind('animMs', 'animMs');
+  $('showText').checked = opts.showText;
+  $('showText').addEventListener('change', () => { opts.showText = $('showText').checked; view.draw(); });
   bind('budget', 'budget');
   $('grammar').checked = opts.grammar;
   $('grammar').addEventListener('change', () => { opts.grammar = $('grammar').checked; });
@@ -517,6 +544,7 @@ function loadDump(data) {
   const s = data?.soup ?? data;
   if (!s?.w || !Array.isArray(s.cells)) throw new Error('not a soup snapshot');
   soup = restore(s);
+  opts.onAnimate = playTurn;
   sched = createScheduler(soup, engine, opts);
   if ([...$('size').options].some(o => Number(o.value) === soup.w)) $('size').value = String(soup.w);
   view.clear();

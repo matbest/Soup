@@ -289,6 +289,14 @@ grow: paste-over leaves several copies of the instruction in a cell, which makes
 keystrokes easier for the model to find — a more robust representation of the same
 program, arrived at by selection rather than design.
 
+A turn plays out on the grid before it is committed: the keystrokes are replayed one
+command at a time, the cell's text is drawn small enough to be texture, and a highlight
+follows the cursor from cell to cell so it can be seen moving and pasting. The replay
+re-runs from the start at each step with the turn's own seed, so `R` falls the same way
+in the replay as in the turn that is finally applied — what is watched is what happens.
+The **animate** dial is milliseconds between commands, 0 for no replay, and **cell text**
+turns the writing in the cells off.
+
 Hovering a cell on the grid shows what is in it and what the model said when it last ran,
 without leaving the run tab. Clicking one opens the same thing in full on the cell tab.
 
