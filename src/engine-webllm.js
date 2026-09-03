@@ -13,7 +13,7 @@ const WEBLLM_URL = 'https://esm.run/@mlc-ai/web-llm@0.2.84';
 // only side of the comparison we can show; the other side is the visitor's to know.
 export const MODELS = [
   { id: 'SmolLM2-135M-Instruct-q0f16-MLC', vram: 360 },
-  { id: 'SmolLM2-360M-Instruct-q4f16_1-MLC', vram: 380 },
+  { id: 'SmolLM2-360M-Instruct-q4f16_1-MLC', vram: 376 },
   { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', vram: 945 },
   { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', vram: 879 },
   { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', vram: 1630 },
