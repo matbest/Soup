@@ -69,11 +69,20 @@ Every round re-sends the growing conversation: reading is paid for in prompt tok
 rounds. A missed anchor is an error in the results, so the model can read and retry
 within the turn.
 
-**Length is capped by the turn budget.** A vi cell's own text is the whole of its prompt,
-and prefill is one GPU dispatch whose duration grows with it. The *turn budget* covers
-prompt and reply together, so a genome too long to afford itself cannot act and therefore
-cannot reproduce. On a small card that is also what stops prefill growing until the
+**The window is the turn budget.** A vi cell's own text is the whole of its prompt, and
+prefill is one GPU dispatch whose duration grows with it. The *turn budget* covers prompt
+and reply together: what fits is sent and the rest is cut, mid-line if that is where the
+line falls. A cell is never refused a turn, but a genome longer than the window has a tail
+the model never sees.
+
+That makes *where* the keys sit in a file matter. The seed puts its keystrokes on the
+first line and so survives being cut; a lineage whose keys drift below the line goes
+sterile without anything else changing. It also means length beyond the window is free —
+it costs no prompt tokens because it is never sent — so the pressure toward brevity acts
+only on the part that fits. And on a small card it is what stops prefill growing until the
 Windows watchdog kills the device.
+
+The cell tab draws the prompt white up to the line and red beyond it.
 
 **Compute is finite.** Each sweep every living cell is given the same allowance of tokens
 (the *tokens/cell* dial; 0 means unlimited). A turn debits what it actually cost, the
@@ -302,11 +311,6 @@ re-runs from the start at each step with the turn's own seed, so `R` falls the s
 in the replay as in the turn that is finally applied — what is watched is what happens.
 The **animate** dial is milliseconds between commands, 0 for no replay, and **cell text**
 turns the writing in the cells off.
-
-The cell tab's *sent to the model* panel draws the prompt in white up to what the turn
-budget allows and in red beyond it, with the count in the heading. The red is not text
-that gets truncated — the whole turn is refused and the cell cannot act — so it marks
-where a genome stopped being able to afford itself.
 
 Hovering a cell on the grid shows what is in it and what the model said when it last ran,
 without leaving the run tab. Clicking one opens the same thing in full on the cell tab.

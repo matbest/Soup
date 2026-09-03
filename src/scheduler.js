@@ -1,5 +1,5 @@
 import { coords, occupiedIndices } from './soup.js';
-import { estimateTokens } from './tokens.js';
+import { estimateTokens, CHARS_PER_TOKEN } from './tokens.js';
 import * as tools from './tools.js';
 import { viPrompt, viTurn, keystrokesFrom } from './vi-soup.js';
 import { seeded } from './vi.js';
@@ -112,27 +112,17 @@ export function createScheduler(soup, engine, opts) {
 
   // A vi turn: one call, and whatever comes back is run as keystrokes over the grid.
   async function viStep(i, cell, x, y) {
-    const messages = viPrompt(cell.md);
     // The turn budget covers everything a turn costs, and in vi mode the cell's own text
-    // is all of the prompt. A genome too long to afford itself cannot act, so it cannot
-    // reproduce: length is priced, and past a point it is lethal. It also keeps prefill —
-    // one GPU dispatch, whose duration grows with it — from growing without limit.
-    const promptTokens = messages.reduce((n, m) => n + estimateTokens(m.content), 0);
-    if (opts.budget > 0 && promptTokens + opts.maxTokens > opts.budget) {
-      soup.tick++;
-      cell.turns++;
-      cell.fails++;
-      const ev = { tick: soup.tick, x, y, mode: 'vi', keys: '', keyCount: 0, effects: [], viLog: [],
-        overBudget: true, usage: null, rounds: [{ out: '', calls: [], results: [] }] };
-      cell.last = ev;
-      log.push(ev);
-      if (log.length > 500) log.shift();
-      return ev;
-    }
+    // is all of the prompt. What fits is sent and the rest is cut: a cell is never refused
+    // a turn, but a genome longer than the window has a tail the model never sees. Where
+    // the keys sit in a file therefore starts to matter, and prefill — one GPU dispatch,
+    // whose duration grows with the prompt — cannot grow without limit.
+    const messages = viPrompt(clip(cell.md, opts.budget, opts.maxTokens));
+    const truncated = messages[1].content.length < cell.md.length;
     active = i;
     let out;
     try {
-      out = await engine.complete({ messages, maxTokens: opts.maxTokens, temperature: opts.temperature });
+      out = await engine.complete({ messages, mode: 'vi', maxTokens: opts.maxTokens, temperature: opts.temperature });
     } finally {
       active = null;
     }
@@ -149,7 +139,7 @@ export function createScheduler(soup, engine, opts) {
     const r = viTurn(soup, x, y, out, { noise: opts.noise, keyLimit: opts.keyLimit ?? 400, rng: seeded(seed) });
     if (!r.effects.length) cell.fails++;
     const ev = {
-      tick: soup.tick, x, y, mode: 'vi', keys: r.keys, keyCount: r.keyCount,
+      tick: soup.tick, x, y, mode: 'vi', keys: r.keys, keyCount: r.keyCount, truncated,
       effects: r.effects, viLog: r.log, usage: engine.lastUsage ?? null,
       rounds: [{ out, calls: [], results: [], finish: engine.lastFinish ?? null }],
     };
@@ -163,6 +153,13 @@ export function createScheduler(soup, engine, opts) {
 }
 
 export { viPrompt };
+
+// As much of a cell's text as the turn budget will carry. Cutting mid-line is deliberate:
+// a window ends where it ends.
+export function clip(md, budget, maxTokens) {
+  const allowed = budget > 0 ? Math.max(0, budget - maxTokens) : Infinity;
+  return allowed === Infinity ? md : md.slice(0, allowed * CHARS_PER_TOKEN);
+}
 
 // What a cell's turn starts from: its own text, then the TOOLS. Nothing else.
 export function prompt(md) {

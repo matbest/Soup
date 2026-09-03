@@ -245,8 +245,7 @@ const clip = (t, n) => (t.length > n ? t.slice(0, n) + '\n…' : t);
 const escape = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 // The prompt, with the part that fits the turn budget in white and anything past it in
-// red. What is past it is not sent short — the whole turn is refused, and the cell cannot
-// act at all — so the red is where a genome stopped being able to afford itself.
+// red. The red is the tail the model never sees: the turn still happens, on what fits.
 function renderPrompt(text) {
   const allowed = opts.budget > 0 ? Math.max(0, opts.budget - opts.maxTokens) : Infinity;
   const cut = allowed === Infinity ? text.length : allowed * CHARS_PER_TOKEN;
@@ -256,7 +255,7 @@ function renderPrompt(text) {
     : `${escape(text.slice(0, cut))}<span class="over">${escape(text.slice(cut))}</span>`;
   $('prompt-head').textContent = allowed === Infinity
     ? `sent to the model — ${used} tokens, no limit set`
-    : `sent to the model — ${used} of ${allowed} tokens${used > allowed ? `, ${used - allowed} too many: this cell cannot act` : ''}`;
+    : `sent to the model — ${used} of ${allowed} tokens${used > allowed ? `, the last ${used - allowed} are not sent` : ''}`;
 }
 
 function showTab(name) {

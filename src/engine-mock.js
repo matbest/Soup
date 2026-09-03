@@ -16,14 +16,18 @@ export function createMockEngine({ rng = Math.random, chatter = 0.02 } = {}) {
     async load() {},
     async unload() {},
     async reset() {},
-    async complete({ messages, maxTokens }) {
+    async complete({ messages, mode, maxTokens }) {
       const promptText = messages[messages.length - 1].content.replace(/\r\n?/g, '\n');
-      // A vi cell's whole prompt is its own text, so there is no marker to look for: if it
-      // carries a fenced block, this stands in for a model that finds it and echoes it,
-      // with a chance of getting one character wrong.
-      const fenced = /```[a-z]*\r?\n([\s\S]*?)```/i.exec(promptText);
-      if (fenced) {
-        let keys = fenced[1].trim().split('\n')[0];
+      // In vi mode it answers only with keystrokes, and only if the cell still carries
+      // some. A cell whose keys have been cut off by the budget gets prose back, which is
+      // what a real model would give it.
+      if (mode === 'vi') {
+        const block = /```[a-z]*\n([\s\S]*?)```/i.exec(promptText);
+        if (!block) {
+          self.lastUsage = { prompt_tokens: Math.ceil(promptText.length / 4), completion_tokens: 12 };
+          return 'I am not sure what to do here.';
+        }
+        let keys = block[1].trim().split('\n')[0];
         if (keys && rng() < chatter * 5) {
           const i = Math.floor(rng() * keys.length);
           keys = keys.slice(0, i) + 'qzx'[Math.floor(rng() * 3)] + keys.slice(i + 1);
