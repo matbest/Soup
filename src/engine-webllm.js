@@ -36,6 +36,7 @@ export const DEFAULT_MODEL = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
 // What this machine turned out to be capable of, kept between page loads so a reload
 // starts where the last run left off instead of learning it again by losing the device.
 const MEMORY = 'soup.machine.';
+const PROBE_AFTER = 12;   // turns without a loss before the window is widened
 
 function remembered(modelId) {
   try { return JSON.parse(localStorage.getItem(MEMORY + modelId)) ?? {}; } catch { return {}; }
@@ -53,7 +54,12 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
     instant: false,
     lastUsage: null,
     prefillRate: known.rate ?? null,   // tokens a second, measured on this machine
-    tighten: known.tighten ?? 1,       // doubles each time this machine loses its device
+    // How much of the estimated safe window to actually use. It creeps up while turns
+    // keep working and is halved the moment the device is lost, so it circles the limit
+    // this machine really has rather than trusting the estimate. Congestion control, for
+    // a watchdog instead of a network.
+    scale: known.scale ?? 1,
+    good: 0,                           // turns since the last loss
     get raw() { return engine; },
     gpu: null,
     lost: null,   // why the GPU device has gone, once it has
@@ -62,7 +68,7 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
     // managed so far. Halved again after each device loss: the machine has just shown
     // that the estimate was too generous.
     promptCap(seconds) {
-      return promptCapFor(self.prefillRate, seconds) / self.tighten;
+      return promptCapFor(self.prefillRate, seconds) * self.scale;
     },
     async load() {
       if (!navigator.gpu) throw new Error('WebGPU is not available in this browser');
@@ -121,9 +127,11 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
     async complete({ messages, schema, maxTokens, temperature }) {
       const gaveUp = () => {
         // Whatever shape the loss arrived in, it means the same thing: the last dispatch
-        // was too long for this machine. Halve what a turn may carry, and keep that.
-        self.tighten = Math.min(self.tighten * 2, 16);
-        remember(modelId, { rate: self.prefillRate, tighten: self.tighten });
+        // was too long for this machine. Halve what a turn may carry and start earning it
+        // back from there.
+        self.scale = Math.max(self.scale / 2, 1 / 16);
+        self.good = 0;
+        remember(modelId, { rate: self.prefillRate, scale: self.scale });
         const e = new Error(`${self.lost} Rebuilding with a window half the size.`);
         e.deviceLost = true;
         return e;
@@ -154,8 +162,15 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       const rate = r.usage?.extra?.prefill_tokens_per_s;
       if (rate > 0) {
         self.prefillRate = self.prefillRate ? self.prefillRate * 0.7 + rate * 0.3 : rate;
-        remember(modelId, { rate: self.prefillRate, tighten: self.tighten });
       }
+      // A run of turns without a loss earns a wider window; the cap keeps the probing
+      // from becoming silly on a machine whose measured rate was simply pessimistic.
+      if (++self.good >= PROBE_AFTER) {
+        self.good = 0;
+        self.scale = Math.min(self.scale * 1.5, 4);
+        onProgress?.(`widening the window to ${Math.round(promptCapFor(self.prefillRate, 1.2) * self.scale)} tokens`);
+      }
+      remember(modelId, { rate: self.prefillRate, scale: self.scale });
       const text = r.choices?.[0]?.message?.content ?? '';
       // Belt and braces: never return more than the slice, whatever the model says.
       return text.slice(0, charBudget(maxTokens) * 2);

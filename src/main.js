@@ -126,8 +126,22 @@ function showStats() {
     (opts.allowance > 0 ? `   ${Math.round(s.income)} tokens/cell/sweep${s.starved ? `, ${s.starved} in debt` : ''}` : '') + '\n' +
     `occupied ${s.occupied}/${s.total}   genomes ${s.distinct}   dominant ${s.dominant}\n` +
     `mean length ${s.meanLen.toFixed(0)} chars, about ${Math.ceil(s.meanLen / 4)} tokens\n` +
-    `fail rate ${(s.failRate * 100).toFixed(1)}%`;
+    `fail rate ${(s.failRate * 100).toFixed(1)}%
+` +
+    windowLine();
   showPopulation();
+}
+
+// What a turn may currently carry, and how that number was arrived at. It moves on its
+// own — up while turns keep working, halved whenever the device is lost — so it is worth
+// being able to watch.
+function windowLine() {
+  const w = promptWindow(engine, opts);
+  if (w === Infinity) return 'window: the whole cell, no limit';
+  const how = engine?.promptCap && engine.promptCap(opts.safeSeconds) <= (opts.budget - opts.maxTokens)
+    ? `this machine at ${Math.round(engine.prefillRate ?? 100)} tok/s` : 'the turn budget';
+  const scale = engine?.scale && engine.scale !== 1 ? `, ${engine.scale.toFixed(2)}x` : '';
+  return `window ${Math.floor(w)} tokens (${how}${scale})`;
 }
 
 // What is persisting, and what it says. Click one to seed the ancestor from it.
@@ -265,7 +279,8 @@ function renderPrompt(text) {
     ? `sent to the model — ${used} tokens, no limit set`
     : `sent to the model — ${used} of ${Math.floor(allowed)} tokens` +
       (used > allowed ? `, the last ${used - Math.floor(allowed)} are not sent` : '') +
-      (engine?.prefillRate ? `  (this machine prefills ${Math.round(engine.prefillRate)}/s)` : '');
+      (engine?.prefillRate ? `  (this machine prefills ${Math.round(engine.prefillRate)}/s)` : '') +
+      (engine?.scale && engine.scale !== 1 ? `  window at ${engine.scale.toFixed(2)}x the estimate` : '');
 }
 
 function showTab(name) {
