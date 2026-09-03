@@ -1,11 +1,14 @@
-import { at, coords, occupiedIndices, neighbourCoords, DIR_NAMES } from './soup.js';
-import { buildMessages, makeSlots } from './document.js';
-import { execute, REPLY_SCHEMA, MANUAL } from './actions.js';
+import { coords, occupiedIndices } from './soup.js';
+import { TOOLS, REPLY_SCHEMA, READS, parseReply, runCall, renderResults } from './tools.js';
 
 const SCHEMA = JSON.stringify(REPLY_SCHEMA);
 
 // Tierra's slicer, minus the reaper. Sweeps every occupied cell once in a random order,
 // one cell per tick, then reshuffles. `opts` is read live so the UI can change it mid-run.
+//
+// A tick is one cell's turn, and a turn is a small agent loop: the cell's text and the
+// TOOLS go to the model; its calls run; if any were reads, the results go back and it
+// gets another round, up to `opts.rounds`. Each round is paid for in tokens.
 export function createScheduler(soup, engine, opts) {
   let queue = [];
   let active = null;   // index of the cell whose turn is at the model right now
@@ -24,45 +27,47 @@ export function createScheduler(soup, engine, opts) {
     }
     const cell = soup.cells[i];
     const [x, y] = coords(soup, i);
-    const { messages, slots } = prompt(soup, x, y, cell.md, opts);
-    active = i;
-    let out;
+    const messages = prompt(cell.md);
+    const ev = { tick: 0, x, y, rounds: [], effects: [], usage: { prompt_tokens: 0, completion_tokens: 0 } };
     try {
-      out = await engine.complete({
-        messages,
-        doc: cell.md,
-        slots,
-        schema: SCHEMA,
-        maxTokens: opts.maxTokens,
-        temperature: opts.temperature,
-      });
+      for (let r = 0; r < Math.max(1, opts.rounds); r++) {
+        active = i;
+        let out;
+        try {
+          out = await engine.complete({ messages, schema: SCHEMA, maxTokens: opts.maxTokens, temperature: opts.temperature });
+        } finally {
+          active = null;
+        }
+        const u = engine.lastUsage;
+        if (u) { ev.usage.prompt_tokens += u.prompt_tokens ?? 0; ev.usage.completion_tokens += u.completion_tokens ?? 0; }
+        const { thoughts, calls } = parseReply(out);
+        const results = calls.map(c => runCall(soup, x, y, c, { noise: opts.noise }));
+        ev.rounds.push({ out, thoughts, calls, results });
+        for (const res of results) if (res.effect) ev.effects.push(res.effect);
+        if (!calls.some(c => READS.has(c.tool))) break;
+        messages.push({ role: 'assistant', content: out }, { role: 'user', content: renderResults(calls, results) });
+      }
     } finally {
-      active = null;
+      soup.tick++;
+      ev.tick = soup.tick;
+      cell.turns++;
+      if (ev.effects.length === 0) cell.fails++;
+      soup.cells[i].last = ev;   // whoever now occupies the cell, possibly a replacement
+      log.push(ev);
+      if (log.length > 500) log.shift();
     }
-    soup.tick++;
-    cell.turns++;
-    const { thoughts, effects } = execute(soup, x, y, out, { noise: opts.noise });
-    if (effects.length === 0) cell.fails++;
-    const ev = { tick: soup.tick, x, y, out, thoughts, effects, usage: engine.lastUsage ?? null };
-    soup.cells[i].last = ev;   // whoever now occupies the cell, possibly a replacement
-    log.push(ev);
-    if (log.length > 500) log.shift();
     return ev;
   }
 
   return { step, log, get active() { return active; } };
 }
 
-// Everything the model will see for the cell at (x, y): its own document, with the slots
-// it carries expanded. Nothing else.
-export function prompt(soup, x, y, doc, opts) {
-  const neighbours = {};
-  for (const d of DIR_NAMES) {
-    const [nx, ny] = neighbourCoords(soup, x, y, d);
-    neighbours[d] = at(soup, nx, ny).md;
-  }
-  const slots = makeSlots({ doc, x, y, neighbours, tokens: opts.maxTokens, manual: MANUAL });
-  return { messages: buildMessages(doc, slots), slots };
+// What a cell's turn starts from: its own text, then the TOOLS. Nothing else.
+export function prompt(md) {
+  return [
+    { role: 'system', content: '' },
+    { role: 'user', content: `${md}\n\n${TOOLS}` },
+  ];
 }
 
 function shuffle(a) {

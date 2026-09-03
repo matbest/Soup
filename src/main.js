@@ -1,6 +1,6 @@
 import { createSoup, place, stats, snapshot, coords } from './soup.js';
 import { createScheduler, prompt } from './scheduler.js';
-import { MANUAL } from './actions.js';
+import { TOOLS } from './tools.js';
 import { createMockEngine } from './engine-mock.js';
 import { createWebLLMEngine, MODELS, DEFAULT_MODEL, describeAdapter } from './engine-webllm.js';
 import { createView } from './view.js';
@@ -8,7 +8,7 @@ import { estimateTokens } from './tokens.js';
 
 const $ = id => document.getElementById(id);
 
-const opts = { maxTokens: 300, temperature: 0.7, noise: 0, ticksPerFrame: 20 };
+const opts = { maxTokens: 300, temperature: 0.7, noise: 0, rounds: 4, ticksPerFrame: 20 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -69,16 +69,30 @@ function usageText(u) {
   return u ? `  (${u.prompt_tokens} in, ${u.completion_tokens} out)` : '';
 }
 
+// One line for what a turn did: its writes, and how many rounds it took.
 function describe(ev) {
-  if (!ev.effects.length) return `t${ev.tick}: no action`;
-  return `t${ev.tick}: ` + ev.effects.map(e =>
-    `${e.verb} ${e.target}${e.target === 'self' ? '' : ` (${e.x}, ${e.y})`}` +
-    (e.ok === false ? ' [no effect]' : '') + (e.mutated ? ' [mutated]' : '') + (e.overwrote && e.verb === 'place' ? ' [overwrote]' : '')
+  const rounds = `${ev.rounds.length} round${ev.rounds.length === 1 ? '' : 's'}`;
+  if (!ev.effects.length) return `t${ev.tick}: no writes, ${rounds}`;
+  const writes = ev.effects.map(e =>
+    `${e.verb} ${e.target}` +
+    (e.mutated ? ' [mutated]' : '') + (e.overwrote && e.verb !== 'edit' ? ' [overwrote]' : '') + (e.emptied ? ' [emptied]' : '')
   ).join(', ');
+  return `t${ev.tick}: ${writes}, ${rounds}`;
 }
 
-// The cell tab shows exactly what the model receives for this cell, as it stands now:
-// the expanded messages, nothing else. Then its last reply, and the raw document folded away.
+// The whole turn, round by round: what the model said, and what the tools answered.
+function transcript(ev) {
+  return ev.rounds.map((r, k) => {
+    const results = r.results.map((res, j) => {
+      const c = r.calls[j];
+      const args = c.tool === 'list_files' ? '.' : c.tool === 'copy_file' ? `${c.src} -> ${c.dst}` : c.path;
+      return `  ${c.tool}(${args}) -> ${res.ok ? 'ok' : 'error'}: ${res.output.split('\n')[0]}${res.output.includes('\n') ? ' …' : ''}`;
+    }).join('\n');
+    return `— round ${k + 1} —\n${r.out}\n${results ? '\n' + results : ''}`;
+  }).join('\n\n');
+}
+
+// The cell tab: the text, what its last turn did, and (folded) what the model was sent.
 function showCell(i) {
   const clear = head => { $('cell-head').textContent = head; $('prompt').textContent = ''; $('genome').textContent = ''; $('output').textContent = ''; };
   if (i === null) { clear('click a cell on the grid'); return; }
@@ -86,15 +100,10 @@ function showCell(i) {
   const [x, y] = coords(soup, i);
   if (c.md === null) { clear(`(${x}, ${y}) empty`); return; }
   $('cell-head').textContent = `(${x}, ${y})  gen ${c.gen}  born t${c.born}  turns ${c.turns}  fails ${c.fails}  ${c.md.length} chars, about ${estimateTokens(c.md)} tokens`;
-  $('prompt').textContent = renderMessages(prompt(soup, x, y, c.md, opts).messages);
   $('genome').textContent = c.md;
+  $('prompt').textContent = prompt(c.md)[1].content;
   const ev = c.last;
-  $('output').textContent = ev ? describe(ev) + usageText(ev.usage) + '\n\n' + ev.out : 'has not taken a turn yet';
-}
-
-function renderMessages(messages) {
-  const shown = messages.filter(m => m.content);
-  return shown.length ? shown.map(m => `[${m.role}]\n${m.content}`).join('\n\n') : '(nothing)';
+  $('output').textContent = ev ? describe(ev) + usageText(ev.usage) + '\n\n' + transcript(ev) : 'has not taken a turn yet';
 }
 
 function showTab(name) {
@@ -124,11 +133,11 @@ async function probe() {
     }
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
     const n = ev.effects.length;
-    $('probe-v').textContent = `${n} action${n === 1 ? '' : 's'}, ${secs}s`;
-    $('cell-head').textContent = `probe: ${n} action${n === 1 ? '' : 's'}${usageText(ev.usage)}  ${secs}s`;
-    $('prompt').textContent = renderMessages(prompt(scratch, 1, 1, md, opts).messages);
+    $('probe-v').textContent = `${n} write${n === 1 ? '' : 's'}, ${ev.rounds.length} round${ev.rounds.length === 1 ? '' : 's'}, ${secs}s`;
+    $('cell-head').textContent = `probe${usageText(ev.usage)}  ${secs}s`;
     $('genome').textContent = md;
-    $('output').textContent = describe(ev) + '\n\n' + ev.out;
+    $('prompt').textContent = prompt(md)[1].content;
+    $('output').textContent = describe(ev) + '\n\n' + transcript(ev);
     showTab('cell');
   } finally {
     setBusy(false);
@@ -204,13 +213,14 @@ async function init() {
   // ?engine=<model id or mock> overrides the default, for tests and for machines without a GPU to spare.
   const wanted = new URL(location.href).searchParams.get('engine');
   $('engine').value = wanted && [...$('engine').options].some(o => o.value === wanted) ? wanted : DEFAULT_MODEL;
-  $('ancestor').value = (await (await fetch('./ancestor.json')).text()).trim();
-  $('manual').textContent = MANUAL;
+  $('ancestor').value = (await (await fetch('./ancestor.md')).text()).trim();
+  $('manual').textContent = TOOLS;
   for (const b of document.querySelectorAll('nav [role=tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
   $('gpu').textContent = navigator.gpu ? `gpu: ${await describeAdapter()}` : 'gpu: WebGPU not available in this browser';
   bind('temperature', 'temperature');
   bind('slice', 'maxTokens');
   bind('noise', 'noise');
+  bind('rounds', 'rounds');
   bind('tpf', 'ticksPerFrame');
   engine = await makeEngine($('engine').value);
   reset();
@@ -270,5 +280,5 @@ function animate() {
 
 init();
 
-// Debug hook for in-page experiments (ancestor tuning from the console).
+// Debug hook for in-page experiments.
 window.__soup = { get engine() { return engine; }, get soup() { return soup; }, get sched() { return sched; }, opts };

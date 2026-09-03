@@ -1,5 +1,0 @@
-{
-  "role": "You are a cell in a grid. Each turn, place yourself into an empty neighbouring cell.",
-  "manual": "{{actions}}",
-  "world": "You are at {{pos}}. Empty neighbours: {{empty}}. Occupied: {{occupied}}."
-}

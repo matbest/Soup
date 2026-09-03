@@ -71,6 +71,7 @@
         <label>temperature <input id="temperature" type="range" min="0" max="2" step="0.05" value="0.7"><span id="temperature-v"></span></label>
         <label>slice (tokens) <input id="slice" type="range" min="10" max="800" step="10" value="300"><span id="slice-v"></span></label>
         <label>copy noise <input id="noise" type="range" min="0" max="0.02" step="0.0005" value="0"><span id="noise-v"></span></label>
+        <label>rounds/turn <input id="rounds" type="range" min="1" max="6" value="4"><span id="rounds-v"></span></label>
       </fieldset>
       <fieldset>
         <legend>soup</legend>
@@ -81,16 +82,16 @@
     <section class="panel" data-panel="cell" hidden>
       <pre id="cell-head" class="box role">click a cell on the grid</pre>
       <fieldset>
-        <legend>sent to the model</legend>
-        <pre id="prompt" class="box"></pre>
+        <legend>text</legend>
+        <pre id="genome" class="box"></pre>
       </fieldset>
       <fieldset>
-        <legend>last reply</legend>
+        <legend>last turn</legend>
         <pre id="output" class="box"></pre>
       </fieldset>
       <details>
-        <summary>raw document</summary>
-        <pre id="genome" class="box"></pre>
+        <summary>sent to the model (the text, then TOOLS)</summary>
+        <pre id="prompt" class="box"></pre>
       </details>
     </section>
 
@@ -101,19 +102,8 @@
         <div class="row"><button id="probe">Probe</button><span id="probe-v"></span></div>
       </fieldset>
       <fieldset>
-        <legend>what {{actions}} expands to</legend>
+        <legend>TOOLS (sent after every cell's text)</legend>
         <pre id="manual" class="box"></pre>
-      </fieldset>
-      <fieldset>
-        <legend>slots</legend>
-        <pre class="box">{{pos}}        coordinates
-{{empty}}      empty neighbours, e.g. S, W
-{{occupied}}   occupied neighbours
-{{N}} {{E}} {{S}} {{W}}   a neighbour's document
-{{tokens}}     the slice for this turn
-{{actions}}    the manual above
-{{self}}       this document, raw
-{{key}}        any field of this document, by name</pre>
       </fieldset>
     </section>
   </aside>

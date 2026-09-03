@@ -35,74 +35,56 @@ whatever was there. That is the whole machine.
 - The scheduler sweeps all occupied cells in a random order, one cell per tick, then
   reshuffles. A cell written mid-sweep runs its new genome when its turn comes.
 
-## Design (v3, the current build)
+## Design (v4, the current build)
 
-The cell is a document, the document is JSON, and the document is the whole program.
+The cell is a markdown file, and the cell is an agent with file tools.
 
-**Document.** A JSON object. What the model receives is that object, every slot inside its
-strings expanded, serialized, as the single user message (the system turn is sent empty so
-the model's own default does not stand in). The host knows no field names: `role`,
-`manual`, `world` in the ancestor mean what the document says they mean, and are as
-mutable and as editable as anything else. A document that is not valid JSON is not dead:
-its whole text is sent with slots expanded, and `place` still copies it byte for byte. It
-has only lost its structure.
+**Document.** Any text. A turn starts from the cell's own text followed by the TOOLS
+block, which is the same for every cell and is the only text the host adds. The system
+turn is sent empty so the model's own default does not stand in.
 
-**Slots.** Observations reach a document only through slots it chooses to carry:
+**Paths.** A cell's world is five files: `self`, `north`, `south`, `east`, `west`. Nothing
+is seen unless read.
 
-    {{pos}}        coordinates
-    {{empty}}      empty neighbours, e.g. "S, W"
-    {{occupied}}   occupied neighbours
-    {{N}} {{E}} {{S}} {{W}}   a neighbour's document
-    {{tokens}}     the slice for this turn
-    {{actions}}    the host's manual for the verbs below
-    {{self}}       this document, raw
-    {{key}}        any field of this document, by name (own fields win over host slots)
+**Tools.** Coding-agent shaped, with anchors rather than line numbers:
 
-No slot, no sight, no cost. Every slot is paid for in prompt tokens each turn.
+    list_files(directory)                which paths exist, and their sizes; also position
+    read_file(path)                      the contents
+    copy_file(src, dst)                  host copy, with noise: how a cell reproduces
+    create_file(path, content)           write a new file over path
+    replace_text(path, old_text, new_text)   first occurrence; exact, then trimmed, then case-insensitive
+    insert_after(path, anchor, text)     a line after the line containing anchor
+    insert_before(path, anchor, text)    a line before it
+    append_text(path, text)              a line at the end; creates the file if empty
+    delete_file(path)                    empty it
 
-**Reply.** One JSON object under a schema (constrained decoding, so it cannot be
-malformed): optional `thoughts`, free text paid for in the slice, then `actions`, at least
-one, executed in order.
+**Turn.** A small agent loop. The reply is one JSON object under a schema (constrained
+decoding, so it cannot be malformed): optional `thoughts`, then `calls`, at least one.
+Calls run in order. Writes take effect at once. If any call was a read, the results go
+back to the model as the next message and it gets another round, up to `rounds` per turn.
+Every round re-sends the growing conversation: reading is paid for in prompt tokens and
+rounds. A missed anchor is an error in the results, so the model can read and retry
+within the turn.
 
-    {"thoughts": "...", "actions": [ {"place": "S"} ]}
+**Death.** `copy_file` and `create_file` over an occupied path replace it. `delete_file`
+empties it. A file can also be edited down to nothing. No reaper.
 
-**Verbs.** D is N, E, S, W or self. Documents are edited by key, never by position: naming
-a key it has just read is the one edit a small model can do reliably.
-
-    {"place":D}                          copy this document into D (host copy, with noise)
-    {"place":D,"doc":{...}}              place the given document instead
-    {"set":D,"key":K,"value":"V"}        set field K of D to the text V
-    {"append":D,"key":K,"value":"T"}     add T to the end of text field K of D
-    {"delete":D,"key":K}                 remove field K from D
-    {"clear":D}                          empty D
-
-A field verb on a document without structure, or a delete of a missing key, is a paid
-no-op. Setting a field in an empty cell creates a document there.
-
-**Where the manual lives.** In one constant beside the schema, exposed as `{{actions}}`.
-The model knows the verbs on a turn only if the document it is running carries the slot
-(or its own `actions` field). Knowledge of the language is hereditary and can be lost;
-the grammar keeps the output valid regardless.
-
-**Mutation.** Host noise on the serialized document at `place`, per character, at a rate
-you set. Most hits change prose inside a string; some break the JSON, and the document
-goes on as plain text. Plus whatever a cell does to itself with `set`/`append`/`delete`
-before it copies.
+**Mutation.** Host noise on `copy_file`, per character, at a rate you set. Plus whatever a
+cell writes into itself or its neighbours.
 
 **Everything else as v1:** torus, one cell per tick in a shuffled sweep, the slice as the
-price, overwrite as the only death, no reaper.
+per-round price, overwrite as death.
 
-**Ancestor.**
+**Ancestor** (`ancestor.md`):
 
-    {
-      "role": "You are a cell in a grid. Each turn, place yourself into an empty neighbouring cell.",
-      "manual": "{{actions}}",
-      "world": "You are at {{pos}}. Empty neighbours: {{empty}}. Occupied: {{occupied}}."
-    }
+    # Cell
 
-(v2, where the reply was the document to place and the model had to echo its own text,
-was built and abandoned the same day: it doubled the prompt and needed a model that can
-reproduce ~200 tokens verbatim. It is in the history.)
+    You are a cell in a grid. Each turn, list the files to find an empty
+    neighbour, then copy self into it.
+
+(v2 had the model echo its own text to reproduce; v3 made the cell a JSON object edited by
+key with slots for observation. Both were built and replaced the same week; the file-tool
+shape is the one the models were trained on.)
 
 ## Engines
 
@@ -124,7 +106,8 @@ ES modules will not load from file://.
 1. Soup + mock engine. Done.
 2. Real model via WebLLM, constrained decoding, host-side mutation. Done (tagged `v1`).
 2b. v2: cell as document, echo-to-reproduce. Built, abandoned.
-2c. v3: JSON document, key verbs, host copy. Built.
+2c. v3: JSON document, key verbs, host copy. Built, replaced.
+2d. v4: markdown file + coding-agent tools, agent loop per turn. Built.
 3. Neighbours' genomes become visible in the observation: the parasite threshold.
 4. Explicit conservation: energy balances, inference debits, reproduction splits.
 5. Instrumentation: lineage tree, genome length over time, diversity.
