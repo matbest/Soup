@@ -282,10 +282,13 @@ async function init() {
     o.textContent = `${m.id.replace(/-(Instruct-)?q\w+-MLC$/, '')}  ~${(m.vram / 1024).toFixed(1)} GB`;
     $('engine').insertBefore(o, mock);
   }
-  // The engine chosen last is remembered, so reloading to pick up an edit does not quietly
-  // put you back on a different model. ?engine=<id> still wins when it is present, for
-  // tests and for trying a model that is not in the picker.
-  const wanted = new URL(location.href).searchParams.get('engine') || localStorage.getItem('soup.engine');
+  // Which engine to start on, in order: what the URL names, then what was chosen last,
+  // then the hosted model if there is a key for it, then the local one. A hosted model is
+  // the better default where a key exists — no GPU, no watchdog, and far more capable —
+  // but the page still has to do something for a visitor without one.
+  const url = new URL(location.href).searchParams.get('engine');
+  const remembered = (() => { try { return localStorage.getItem('soup.engine'); } catch { return null; } })();
+  const wanted = url || remembered || (storedKey() ? PREFIX + PREFERRED : null);
   if (wanted && ![...$('engine').options].some(o => o.value === wanted)) {
     const o = document.createElement('option');
     o.value = wanted;
