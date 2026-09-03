@@ -43,6 +43,26 @@
   .genome { background: #101214; border: 1px solid #23262a; padding: 4px; margin-bottom: 3px; cursor: pointer; color: #e6e1d6; }
   .genome:hover { border-color: #6b8f84; }
   details summary { cursor: pointer; color: #8fa39b; }
+  #vi-panel { position: fixed; inset: 0; background: #0a0b0c; padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: auto; z-index: 10; }
+  #vi-panel[hidden] { display: none !important; }
+  #vi-panel header { display: flex; flex-direction: column; gap: 6px; }
+  #vi-mode { color: #8fa39b; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  #vi-mode.capturing { color: #e0b0a0; }
+  #vi-keys { height: 54px; }
+  #vi-stream { display: flex; flex-wrap: wrap; gap: 2px; }
+  #vi-stream .key { border: 1px solid #23262a; padding: 1px 4px; color: #55605e; cursor: pointer; min-width: 12px; text-align: center; }
+  #vi-stream .key.done { color: #e6e1d6; border-color: #3d4a46; background: #15181b; }
+  #vi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; flex: 1; min-height: 0; }
+  .vibuf { border: 1px solid #23262a; background: #101214; display: flex; flex-direction: column; min-height: 90px; overflow: auto; }
+  .vibuf.blank { border: none; background: none; }
+  .vibuf.here { border-color: #6b8f84; }
+  .vibuf.changed .vibuf-head { color: #e0b0a0; }
+  .vibuf-head { padding: 2px 5px; color: #8fa39b; border-bottom: 1px solid #23262a; }
+  .vibuf-body { padding: 5px; margin: 0; color: #e6e1d6; }
+  .cursor { background: #6b8f84; color: #0a0b0c; }
+  .cursor.insert { background: #e0b0a0; }
+  .inline { display: inline-flex; gap: 4px; align-items: center; grid-template-columns: none; }
+  #vi-help { color: #8fa39b; }
   @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } .stage { max-height: none; width: 100%; } }
 </style>
 </head>
@@ -56,6 +76,7 @@
       <button role="tab" data-tab="run" aria-selected="true">run</button>
       <button role="tab" data-tab="cell" aria-selected="false">cell</button>
       <button role="tab" data-tab="setup" aria-selected="false">setup</button>
+      <button role="tab" data-tab="vi" aria-selected="false">vi</button>
     </nav>
 
     <section class="panel" data-panel="run">
@@ -130,6 +151,32 @@ a run paces itself. No GPU needed.</pre>
     </section>
   </aside>
 </main>
+
+<section id="vi-panel" hidden>
+  <header>
+    <h1>vi <span id="vi-mode"></span></h1>
+    <div class="row">
+      <button id="vi-run">Run all</button>
+      <button id="vi-back">&lt; Back</button>
+      <button id="vi-step">Step &gt;</button>
+      <button id="vi-clear">Clear keys</button>
+      <button id="vi-apply">Apply as new start</button>
+      <button id="vi-reset">Reset buffers</button>
+      <label class="inline"><input id="vi-capture" type="checkbox"> type straight in</label>
+    </div>
+  </header>
+  <textarea id="vi-keys" spellcheck="false" placeholder="keystrokes, e.g. ggyGLggVGp  (&lt;Esc&gt; &lt;CR&gt; &lt;BS&gt; &lt;Tab&gt; spelled out)"></textarea>
+  <div id="vi-stream"></div>
+  <div class="row" id="vi-presets"></div>
+  <div id="vi-grid"></div>
+  <pre class="box" id="vi-help">h j k l  0 ^ $  w b e  gg G  {count}       move the cursor
+H J K L                                    move to the west / south / north / east cell
+i a I A o O   <Esc>                        insert
+x D r{ch}  dd dw d$ dG  cc cw C  2dd       delete and change
+yy Y ygg yG   p P                          yank and paste (one register, shared across cells)
+V then a motion then d y c p               visual line: p replaces the selection
+Reproduction is ggyGLggVGp: yank all, move east, select all, paste over.</pre>
+</section>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

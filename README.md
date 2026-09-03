@@ -195,3 +195,26 @@ ES modules will not load from file://.
 3. Neighbours' genomes become visible in the observation: the parasite threshold.
 4. Explicit conservation: energy balances, inference debits, reproduction splits.
 5. Instrumentation: lineage tree, genome length over time, diversity.
+
+## The vi branch
+
+An experiment on branch `vi`: the cell's instruction set is a small vi, and the string the
+model returns is keystrokes rather than JSON.
+
+The appeal is Tierra's property. Almost every character is a valid command, so a mutated
+keystroke string is still a program that does something — where a mutated JSON call is
+usually just malformed. Mutations of the ancestor `ggyGLggVGp` (yank all, move east,
+select all, paste over) give: `ggyGKggVGp` reproduces north instead; `ggyGLgVGp` appends
+rather than replaces; `ggyGLggVGq` is sterile; `xgyGLggVGp` damages itself and then copies
+the damage. All of them run.
+
+A turn edits five buffers — self, north, south, east, west. `h j k l` move the cursor
+inside a buffer; `H J K L` move to the west, south, north and east cell. There is no
+filesystem and no `:w`: a buffer is a cell and editing it is the write. One register,
+belonging to the turn, is what carries text between cells. A cell's cursor position is
+part of its state, so where a lineage leaves its cursor is inherited with its text.
+
+The **vi** tab is a bench for trying it by hand: five buffers laid out around the cursor,
+the keystroke stream shown key by key (click any key to run up to that point), Step and
+Back, presets, and a box to type straight in. *Apply as new start* takes the result as the
+next starting point, the way one turn hands on to the next.

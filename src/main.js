@@ -6,6 +6,7 @@ import { createMockEngine } from './engine-mock.js';
 import { createWebLLMEngine, MODELS, DEFAULT_MODEL, describeAdapter } from './engine-webllm.js';
 import { createOpenRouterEngine, freeModels, storedKey, storeKey, PREFIX } from './engine-openrouter.js';
 import { createView } from './view.js';
+import { createViLab } from './vi-lab.js';
 import { estimateTokens } from './tokens.js';
 
 const $ = id => document.getElementById(id);
@@ -131,9 +132,17 @@ function showCell(i) {
   $('output').textContent = ev ? describe(ev) + usageText(ev.usage) + '\n\n' + transcript(ev) : 'has not taken a turn yet';
 }
 
+let viLab = null;
+
 function showTab(name) {
   for (const b of document.querySelectorAll('nav [role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
   for (const p of document.querySelectorAll('.panel')) p.hidden = p.dataset.panel !== name;
+  // The vi bench wants the whole screen, so it covers everything else while it is open.
+  $('vi-panel').hidden = name !== 'vi';
+  if (name === 'vi') {
+    if (!viLab) { viLab = createViLab(); viLab.mount(); }
+    else viLab.render();
+  }
 }
 
 // One turn of the current ancestor, alone in a scratch grid, with the real engine:
