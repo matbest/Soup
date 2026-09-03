@@ -1,6 +1,7 @@
 import { createSoup, place, stats, snapshot, restore, coords } from './soup.js';
 import { createScheduler, prompt } from './scheduler.js';
-import { setTools } from './tools.js';
+import * as toolset from './tools.js';
+const { setTools } = toolset;
 import { createMockEngine } from './engine-mock.js';
 import { createWebLLMEngine, MODELS, DEFAULT_MODEL, describeAdapter } from './engine-webllm.js';
 import { createOpenRouterEngine, freeModels, storedKey, storeKey, PREFIX } from './engine-openrouter.js';
@@ -367,7 +368,15 @@ async function loadFreeModels() {
 function dump() {
   return {
     saved: new Date().toISOString(),
+    // Enough to know what produced this without asking: which model, on which device,
+    // with which prompt and which settings.
     engine: engine.name,
+    device: engine.gpu ?? null,
+    tools: toolset.TOOLS.startsWith('TOOLS.') ? 'short' : 'full',
+    toolsTokens: Math.ceil(toolset.TOOLS.length / 4),
+    url: location.href,
+    recoveries,
+    deviceLost: engine.lost ?? null,
     opts,
     stats: stats(soup),
     soup: JSON.parse(snapshot(soup)),
