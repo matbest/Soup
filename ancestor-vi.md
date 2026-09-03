@@ -22,8 +22,5 @@ move one whole cell west, south, north, east; `i a o` insert and `<Esc>`
 stops inserting; `yy` yanks a line and `p P` paste; `V` starts a line
 selection, `d` deletes and `x` deletes one character.
 
-Every turn costs tokens, and a cell is given only so many. A shorter file
-costs less to run and so gets to run more often.
-
 Copying is imperfect, so a copy of this file may differ from it. What you
 are reading is whatever survived.
