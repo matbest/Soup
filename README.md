@@ -235,9 +235,13 @@ failing any marking a last line that looks like keys rather than words. A reply 
 nothing usable in it runs nothing, because prose executed as vi is destruction, and the
 turn has still spent its slice.
 
-Because the cell is everything, the key reference lives in the cell too. The ancestor
-(`ancestor-vi.md`) carries its own table of keys and its own fenced `ggyGLggVGp`, which
-makes that knowledge heritable and mutable like the rest: a lineage that keeps a good
+Because the cell is everything, the key reference lives in the cell too. The seed mother
+(`ancestor-vi.md`) opens with the fenced `ggyGLggVGp` and the instruction to reply with
+it, and only then explains what the keys do and what is going on — a model's reply tends
+to mirror the shape of what it was given, so the payload goes first and the prose after.
+An earlier version led with a table of keys, and a 1B model answered by narrating the
+table one key at a time until it ran out of tokens, never reaching the instruction. That
+makes the reference heritable and mutable like the rest: a lineage that keeps a good
 reference reproduces, one that loses it drifts. That is the whole experiment. A cell's
 text is not data the model reads about, it is the thing that has to induce a working
 program.
