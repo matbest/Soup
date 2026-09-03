@@ -207,6 +207,7 @@ function failed(err) {
   $('status').textContent = `turn failed: ${err?.message ?? err}`;
   console.error('[soup] turn failed', err);
   view.draw();
+  save('failed.json', { failed: String(err?.stack ?? err?.message ?? err) });   // the evidence, kept
 }
 
 // Stop the loop and wait for any turn already at the model, so a reset or engine swap
@@ -292,6 +293,8 @@ async function init() {
       else $('status').textContent = 'soup is dead';
       save();
     } catch (err) {
+      // A GPU reset should cost a model rebuild, not the run, whether stepping or running.
+      if (err?.deviceLost && await recoverEngine()) return;
       failed(err);
     } finally {
       setBusy(false);
@@ -387,10 +390,10 @@ function loadDump(data) {
 // The dev server takes POST /save/<name>; a published copy does not, so a failure here is
 // not worth reporting more than once.
 let saveBroken = false;
-async function save(name = 'latest.json') {
+async function save(name = 'latest.json', extra = {}) {
   if (saveBroken) return;
   try {
-    const r = await fetch(`/save/${name}`, { method: 'POST', body: JSON.stringify(dump(), null, 2) });
+    const r = await fetch(`/save/${name}`, { method: 'POST', body: JSON.stringify({ ...dump(), ...extra }, null, 2) });
     if (!r.ok) throw new Error(`${r.status}`);
   } catch {
     saveBroken = true;

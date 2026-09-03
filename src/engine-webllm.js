@@ -107,6 +107,14 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
         });
       } catch (err) {
         if (self.lost) throw gaveUp();
+        // A watchdog reset frees everything the runtime holds, and the wrapper for
+        // whichever object the call touched first is what complains: the matcher, the
+        // tokenizer, a tensor. The console line naming the real cause may not have
+        // arrived yet, so treat these as the same event and let the page rebuild.
+        if (/deleted|disposed/i.test(err?.message ?? String(err))) {
+          self.lost = 'the GPU device was lost (the runtime found its objects freed).';
+          throw gaveUp();
+        }
         throw err;
       }
       self.lastUsage = r.usage ?? null;
