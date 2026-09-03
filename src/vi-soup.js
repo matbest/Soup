@@ -100,6 +100,7 @@ export function viTurn(soup, x, y, reply, { noise = 0, keyLimit = 400, rng = Mat
 
     const was = cell.md;
     if (c.text === null) {
+      if (was !== null) soup.deaths++;
       cell.md = null;
       cell.gen = 0; cell.turns = 0; cell.fails = 0; cell.last = null;
       effects.push({ verb: 'emptied', dx: c.dx, dy: c.dy, x: tx, y: ty, overwrote: was !== null });
@@ -108,6 +109,8 @@ export function viTurn(soup, x, y, reply, { noise = 0, keyLimit = 400, rng = Mat
     // Writing is lossy: this is where variation enters, and it is the instruction string
     // that varies.
     const text = mutate(c.text, noise);
+    if (was === null) soup.births++;
+    else if (text !== was) soup.deaths++;   // whoever was here has been written over
     cell.md = text;
     if (was === null) { cell.born = soup.tick; cell.turns = 0; cell.fails = 0; cell.last = null; }
     if (c.dx !== 0 || c.dy !== 0) cell.gen = source.gen + 1;

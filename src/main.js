@@ -1,4 +1,4 @@
-import { createSoup, place, stats, snapshot, restore, population, coords } from './soup.js';
+import { createSoup, place, stats, snapshot, restore, population, genotype, coords } from './soup.js';
 import { createScheduler, prompt, promptWindow } from './scheduler.js';
 import * as toolset from './tools.js';
 const { setTools } = toolset;
@@ -151,7 +151,7 @@ function showPopulation() {
     const el = document.createElement('pre');
     el.className = 'genome';
     el.title = g.md;
-    el.textContent = `${String(g.n).padStart(3)} cells  gen ${g.maxGen}  since t${g.oldest}  ${g.md.length}c\n     ${firstLine(g.md)}`;
+    el.textContent = `${genotype(g.md)}   ${String(g.n).padStart(3)} cells  gen ${g.maxGen}  since t${g.oldest}\n     ${firstLine(g.md)}`;
     el.addEventListener('click', () => { $('ancestor').value = g.md; showTab('setup'); });
     $('pop').appendChild(el);
   }
@@ -294,7 +294,7 @@ function showTab(name) {
   for (const p of document.querySelectorAll('.panel')) p.hidden = p.dataset.panel !== name;
   // The vi bench wants the whole screen, so it covers everything else while it is open.
   $('vi-panel').hidden = name !== 'vi';
-  if (name === 'pop') listSaves();
+  if (name === 'pop') { listSaves(); showHistory(); }
   if (name === 'vi') {
     if (!viLab) { viLab = createViLab(); viLab.mount(); }
     else viLab.render();
@@ -572,6 +572,21 @@ async function init() {
   $('export2').addEventListener('click', () => $('export').click());
   $('load2').addEventListener('click', () => $('loadfile').click());
   $('save-as').addEventListener('click', saveNamed);
+  $('log-csv').addEventListener('click', () => {
+    // A row a sweep, in the shape a spreadsheet wants.
+    const h = soup.history ?? [];
+    if (!h.length) { $('log-note').textContent = 'nothing logged yet'; return; }
+    const head = 'sweep,tick,alive,kinds,len_min,len_median,len_mean,len_max,births,deaths,fail_pct,tokens,window,commonest,commonest_n';
+    const rows = h.map(r => [r.sweep, r.tick, r.alive, r.kinds, r.len.min, r.len.median, r.len.mean, r.len.max,
+      r.births, r.deaths, r.fails, r.spent, r.window ?? '', r.top[0]?.[0] ?? '', r.top[0]?.[1] ?? ''].join(','));
+    const blob = new Blob([[head, ...rows].join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `soup-log-t${soup.tick}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    $('log-note').textContent = `${h.length} sweeps`;
+  });
   $('save-name').addEventListener('keydown', e => { if (e.key === 'Enter') saveNamed(); });
   $('reset').addEventListener('click', async () => { await stop(); reset(); });
   $('size').addEventListener('change', async () => { await stop(); reset(); });
@@ -661,6 +676,19 @@ async function loadAncestor() {
   const file = opts.mode === 'vi' ? (min ? './ancestor-vi-min.md' : './ancestor-vi.md') : './ancestor.md';
   // Normalised, so a seed saved with Windows line endings still parses the same.
   $('ancestor').value = (await (await fetch(file)).text()).replace(/\r\n?/g, '\n').trim();
+}
+
+// The run as a table: the things Tierra plotted. Newest last, so it reads down like a log.
+function showHistory() {
+  const h = soup?.history ?? [];
+  if (!h.length) { $('history').textContent = 'nothing yet — a row is written at the close of every sweep'; return; }
+  const head = 'sweep  tick  alive kinds   len min/med/max  births deaths fail%  commonest';
+  const rows = h.slice(-40).map(r =>
+    String(r.sweep).padStart(5) + String(r.tick).padStart(6) + String(r.alive).padStart(7) +
+    String(r.kinds).padStart(6) + `${r.len.min}/${r.len.median}/${r.len.max}`.padStart(16) +
+    String(r.births).padStart(7) + String(r.deaths).padStart(7) + String(r.fails).padStart(6) +
+    '  ' + (r.top[0] ? `${r.top[0][0]} x${r.top[0][1]}` : ''));
+  $('history').textContent = [head, ...rows].join('\n');
 }
 
 // Keep the soup under a name, so a run worth returning to is not overwritten by the next

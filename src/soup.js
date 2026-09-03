@@ -3,11 +3,23 @@
 export const DIRS = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
 export const DIR_NAMES = Object.keys(DIRS);
 
+// Tierra named a creature by its length and a letter — 0080aaa, 0045aaa — so that the
+// size of a thing was legible in its name and the famous plot could be read at a glance.
+// Same idea here: length, then a hash of the text, so identical texts share a name.
+export function genotype(md) {
+  return `${String(md.length).padStart(4, '0')}-${hashMd(md).toString(36).slice(-4).padStart(4, '0')}`;
+}
+
 export function createSoup(w, h) {
   // `spent` is the compute this sweep has used, in tokens. Compute is finite, so what one
   // cell spends is not there for another: that is the only thing they compete over apart
   // from space.
-  return { w, h, tick: 0, sweep: 0, spent: 0, starved: 0, cells: Array.from({ length: w * h }, emptyCell) };
+  return {
+    w, h, tick: 0, sweep: 0, spent: 0, starved: 0,
+    births: 0, deaths: 0,        // written into an empty place; a living cell written over
+    history: [],                 // one row per sweep, for reading the run afterwards
+    cells: Array.from({ length: w * h }, emptyCell),
+  };
 }
 
 export function emptyCell() {
@@ -110,6 +122,7 @@ export function restore(data) {
   soup.tick = data.tick ?? 0;
   soup.sweep = data.sweep ?? 0;
   soup.spent = data.spent ?? 0;
+  soup.history = data.history ?? [];
   (data.cells || []).forEach((c, i) => {
     if (!c || c.md == null || i >= soup.cells.length) return;
     Object.assign(soup.cells[i], emptyCell(), {
@@ -134,9 +147,33 @@ export function population(soup, top = 6) {
   return [...groups.values()].sort((a, b) => b.n - a.n || a.oldest - b.oldest).slice(0, top);
 }
 
+// One row a sweep: the things Tierra's plots were drawn from — how many are alive, how
+// many kinds there are, how long they are, what was born and what died, and what it cost.
+export function recordSweep(soup, extra = {}) {
+  const s = stats(soup);
+  const lens = soup.cells.filter(c => c.md !== null).map(c => c.md.length).sort((a, b) => a - b);
+  soup.history.push({
+    sweep: soup.sweep,
+    tick: soup.tick,
+    alive: s.occupied,
+    kinds: s.distinct,
+    len: { min: lens[0] ?? 0, median: lens[lens.length >> 1] ?? 0, mean: Math.round(s.meanLen), max: lens[lens.length - 1] ?? 0 },
+    births: soup.births,
+    deaths: soup.deaths,
+    fails: Number((s.failRate * 100).toFixed(1)),
+    spent: soup.spent,
+    top: population(soup, 3).map(g => [genotype(g.md), g.n]),
+    ...extra,
+  });
+  soup.births = 0;
+  soup.deaths = 0;
+  if (soup.history.length > 5000) soup.history.shift();
+}
+
 export function snapshot(soup) {
   return JSON.stringify({
     w: soup.w, h: soup.h, tick: soup.tick, sweep: soup.sweep, spent: soup.spent ?? 0,
+    births: soup.births ?? 0, deaths: soup.deaths ?? 0, history: soup.history ?? [],
     cells: soup.cells.map(c => ({ md: c.md, gen: c.gen, born: c.born, turns: c.turns, fails: c.fails })),
   });
 }

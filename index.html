@@ -42,7 +42,8 @@
   #or-note { align-self: center; color: #8fa39b; }
   #probe-v { color: #8fa39b; }
   #save-name { width: 150px; background: #101214; color: #e6e1d6; border: 1px solid #23262a; padding: 3px 5px; font: inherit; }
-  #save-note { color: #8fa39b; }
+  #save-note, #log-note { color: #8fa39b; }
+  #history { max-height: 220px; overflow: auto; }
   .save { background: #101214; border: 1px solid #23262a; padding: 4px 6px; margin-bottom: 3px; cursor: pointer; color: #e6e1d6; }
   .save:hover { border-color: #6b8f84; }
   .genome { background: #101214; border: 1px solid #23262a; padding: 4px; margin-bottom: 3px; cursor: pointer; color: #e6e1d6; }
@@ -168,6 +169,11 @@
           <button id="reset2">Start again</button>
         </div>
         <span id="save-note"></span>
+      </fieldset>
+      <fieldset>
+        <legend>the run, a row per sweep</legend>
+        <pre id="history" class="box"></pre>
+        <div class="row"><button id="log-csv">Download the log</button><span id="log-note"></span></div>
       </fieldset>
       <fieldset>
         <legend>saved soups (click one to load it)</legend>

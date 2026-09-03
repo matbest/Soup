@@ -1,4 +1,4 @@
-import { coords, occupiedIndices } from './soup.js';
+import { coords, occupiedIndices, recordSweep } from './soup.js';
 import { estimateTokens, CHARS_PER_TOKEN } from './tokens.js';
 import * as tools from './tools.js';
 import { viPrompt, viTurn, keystrokesFrom } from './vi-soup.js';
@@ -35,6 +35,7 @@ export function createScheduler(soup, engine, opts) {
       if (queue.length === 0) {
         const living = occupiedIndices(soup);
         if (living.length === 0) return null;   // the soup is dead
+        if (soup.sweep > 0) recordSweep(soup, { window: Math.floor(promptWindow(engine, opts)) });
         soup.sweep++;
         soup.spent = 0;
         soup.income = opts.allowance > 0 ? opts.allowance : 0;

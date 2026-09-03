@@ -389,6 +389,24 @@ soups sit beside the automatic saves in `runs/` and are listed newest first; cli
 loads it back, tick and lineage intact. The naming matters because `latest.json` is
 overwritten every twenty ticks, so a run worth returning to needs a name of its own.
 
+### Reading a run
+
+Every cell has a **genotype** name in Tierra's style — `0193-z4yk` — its length, then a
+hash of its text, so identical texts share a name and the size of a thing is legible in
+it. Ray's creatures were named the same way, `0080aaa` and `0045aaa`, which is why his
+famous plot can be read at a glance.
+
+At the close of every sweep a row is written: how many cells are alive, how many kinds
+there are, the shortest, median and longest genome, how many were born and how many were
+written over, the failure rate, the tokens spent, the prompt window, and the commonest
+genotype with its count. The population tab shows the last forty rows and will download
+the lot as a CSV. The whole history travels inside a saved soup, so a run can be picked
+apart afterwards.
+
+Those are the numbers Tierra was read through — size over time above all, since the
+result everyone remembers is an ancestor of 80 instructions giving way to parasites of 45
+and then to an optimised replicator of 36.
+
 The **vi** tab is a bench for trying it by hand: a window of the grid around the cursor,
 the keystroke stream shown key by key (click any key to run up to that point), Step and
 Back, presets, and a box to type straight in. *Apply as new start* takes the result as the
