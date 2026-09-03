@@ -39,12 +39,13 @@ whatever was there. That is the whole machine.
 
 The cell is a document, the document is JSON, and the document is the whole program.
 
-**Document.** A JSON object. `system` and `user` are the only keys the host knows: they are
-sent as those messages with slots expanded, once. Any other key is the cell's own state,
-readable through a slot of the same name. The host injects no prompt of its own, ever. A
-document that is not valid JSON is not dead: its whole text is sent as the user message,
-slots still expand, and `place` still copies it byte for byte. It has only lost its
-structure.
+**Document.** A JSON object. What the model receives is that object, every slot inside its
+strings expanded, serialized, as the single user message (the system turn is sent empty so
+the model's own default does not stand in). The host knows no field names: `role`,
+`manual`, `world` in the ancestor mean what the document says they mean, and are as
+mutable and as editable as anything else. A document that is not valid JSON is not dead:
+its whole text is sent with slots expanded, and `place` still copies it byte for byte. It
+has only lost its structure.
 
 **Slots.** Observations reach a document only through slots it chooses to carry:
 
@@ -94,8 +95,9 @@ price, overwrite as the only death, no reaper.
 **Ancestor.**
 
     {
-      "system": "You are a cell in a grid. Each turn, place yourself into an empty neighbouring cell.",
-      "user": "{{actions}}\n\nYou are at {{pos}}. Empty neighbours: {{empty}}. Occupied: {{occupied}}."
+      "role": "You are a cell in a grid. Each turn, place yourself into an empty neighbouring cell.",
+      "manual": "{{actions}}",
+      "world": "You are at {{pos}}. Empty neighbours: {{empty}}. Occupied: {{occupied}}."
     }
 
 (v2, where the reply was the document to place and the model had to echo its own text,

@@ -93,7 +93,8 @@ function showCell(i) {
 }
 
 function renderMessages(messages) {
-  return messages.map(m => `[${m.role}]\n${m.content || '(empty)'}`).join('\n\n');
+  const shown = messages.filter(m => m.content);
+  return shown.length ? shown.map(m => `[${m.role}]\n${m.content}`).join('\n\n') : '(nothing)';
 }
 
 function showTab(name) {

@@ -1,11 +1,12 @@
 // A cell is a document, and the document is the whole program. This module turns one
-// into the messages a model receives, and nothing more: the host injects no prompt.
+// into what a model receives, and nothing more: the host injects no prompt, and knows
+// no field names.
 //
-// A document is a JSON object. `system` and `user` are the only keys the host knows;
-// they are sent as those messages with slots expanded, once. Any other key is the
-// cell's own state, readable through a slot of the same name. A document that is not
-// valid JSON is not dead: its whole text is sent as the user message, slots still
-// expand, and `place` still copies it byte for byte. It has only lost its structure.
+// A document is a JSON object. What the model gets is that object, every slot inside
+// its strings expanded, serialized, as the single user message. The field names mean
+// whatever the document says they mean. A document that is not valid JSON is not dead:
+// its whole text is sent with slots expanded, and `place` still copies it byte for
+// byte. It has only lost its structure.
 
 import { DIR_NAMES } from './soup.js';
 
@@ -28,21 +29,31 @@ export function expand(text, slots) {
 
 const asText = v => (typeof v === 'string' ? v : JSON.stringify(v));
 
+// Expand slots in every string inside a value, leaving structure alone.
+function expandDeep(v, slots) {
+  if (typeof v === 'string') return expand(v, slots);
+  if (Array.isArray(v)) return v.map(x => expandDeep(x, slots));
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, expandDeep(x, slots)]));
+  return v;
+}
+
 // The document's own fields become slots too, and take precedence over the host's: a
 // document that carries its own `actions` field has replaced the manual with its own.
+// The system turn is sent empty so the model's own default ("You are a helpful
+// assistant.") does not stand in for one.
 export function buildMessages(md, hostSlots) {
   const doc = parseDoc(md);
-  if (!doc) {
-    return [
-      { role: 'system', content: '' },
-      { role: 'user', content: expand(md, hostSlots) },
-    ];
+  let content;
+  if (doc) {
+    const slots = { ...hostSlots };
+    for (const [k, v] of Object.entries(doc)) if (v !== null && v !== undefined) slots[k] = asText(v);
+    content = serialize(expandDeep(doc, slots));
+  } else {
+    content = expand(md, hostSlots);
   }
-  const slots = { ...hostSlots };
-  for (const [k, v] of Object.entries(doc)) if (v !== null && v !== undefined) slots[k] = asText(v);
   return [
-    { role: 'system', content: expand(asText(doc.system ?? ''), slots) },
-    { role: 'user', content: expand(asText(doc.user ?? ''), slots) },
+    { role: 'system', content: '' },
+    { role: 'user', content },
   ];
 }
 
