@@ -282,14 +282,15 @@ async function init() {
     o.textContent = `${m.id.replace(/-(Instruct-)?q\w+-MLC$/, '')}  ~${(m.vram / 1024).toFixed(1)} GB`;
     $('engine').insertBefore(o, mock);
   }
-  // ?engine=<model id or mock> overrides the default: for tests, for machines without a GPU
-  // to spare, and for trying any model WebLLM knows that is not in the picker.
-  const wanted = new URL(location.href).searchParams.get('engine');
+  // The engine chosen last is remembered, so reloading to pick up an edit does not quietly
+  // put you back on a different model. ?engine=<id> still wins when it is present, for
+  // tests and for trying a model that is not in the picker.
+  const wanted = new URL(location.href).searchParams.get('engine') || localStorage.getItem('soup.engine');
   if (wanted && ![...$('engine').options].some(o => o.value === wanted)) {
     const o = document.createElement('option');
     o.value = wanted;
-    o.textContent = wanted.replace(/-MLC$/, '');
-    $('engine').insertBefore(o, mock);
+    o.textContent = wanted.startsWith(PREFIX) ? wanted.slice(PREFIX.length) : wanted.replace(/-MLC$/, '');
+    ($('or-group') && wanted.startsWith(PREFIX) ? $('or-group') : $('engine')).appendChild(o);
   }
   $('engine').value = wanted || DEFAULT_MODEL;
   opts.mode = new URL(location.href).searchParams.get('mode') === 'tools' ? 'tools' : 'vi';
@@ -357,6 +358,7 @@ async function init() {
   $('size').addEventListener('change', async () => { await stop(); reset(); });
   $('engine').addEventListener('change', async () => {
     await stop();
+    try { localStorage.setItem('soup.engine', $('engine').value); } catch { /* private mode */ }
     const old = engine;
     engine = await makeEngine($('engine').value);
     if (old !== engine) await old.unload?.();   // never leave two models on the GPU
