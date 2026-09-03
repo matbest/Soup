@@ -60,14 +60,18 @@ function detail(body) {
   }
 }
 
-export function createOpenRouterEngine(modelId, { onProgress, minIntervalMs = 3500 } = {}) {
+export function createOpenRouterEngine(modelId, { onProgress, getRpm = () => 15 } = {}) {
   let supportsSchema = false;
   let nextAllowedAt = 0;
+  let backoff = 1;        // grows when the service says no, shrinks when it stops saying it
+  let consecutive429 = 0;
 
   const self = {
     name: modelId,
     instant: false,
     lastUsage: null,
+    rateLimit: null,
+    remaining: null,
     lastFinish: null,
     lastReasoning: '',
     gpu: 'openrouter',
@@ -83,13 +87,18 @@ export function createOpenRouterEngine(modelId, { onProgress, minIntervalMs = 35
       const body = await who.text();
       if (!who.ok) throw new Error(`OpenRouter rejected the key (${who.status}): ${detail(body)}`);
       const info = JSON.parse(body).data ?? {};
+      // What the service says it will allow, so a long run can pace itself to it.
+      self.rateLimit = info.rate_limit ?? null;
+      self.remaining = info.limit_remaining ?? null;
+      self.usage = info.usage ?? null;
       onProgress?.(`checking ${modelId}`);
       const models = await freeModels();
       const found = models.find(m => m.id === modelId);
       if (!found) throw new Error(`${modelId} is not in OpenRouter's free list right now`);
       supportsSchema = found.schema;
       const limit = info.limit_remaining != null ? `, ${info.limit_remaining} left` : info.is_free_tier ? ', free tier' : '';
-      self.gpu = `openrouter, ${found.ctx.toLocaleString()} ctx${found.schema ? ', schema' : ''}${limit}`;
+      const rl = self.rateLimit ? `, ${self.rateLimit.requests}/${self.rateLimit.interval}` : '';
+      self.gpu = `openrouter, ${found.ctx.toLocaleString()} ctx${found.schema ? ', schema' : ''}${limit}${rl}`;
     },
 
     async unload() {},
@@ -127,12 +136,28 @@ export function createOpenRouterEngine(modelId, { onProgress, minIntervalMs = 35
         });
 
         if (r.status === 429 || r.status === 503) {
-          if (attempt >= 3) throw new Error(`OpenRouter is rate limiting this key (${r.status}); slow the run down or wait`);
-          const wait = Number(r.headers.get('retry-after')) * 1000 || 5000 * (attempt + 1);
-          onProgress?.(`rate limited, waiting ${Math.round(wait / 1000)}s`);
+          const body = await r.text();
+          consecutive429++;
+          // Each refusal widens the gap between requests, so a long run finds the pace the
+          // service will accept instead of hammering it and being cut off.
+          backoff = Math.min(backoff * 1.6, 20);
+          const wait = Number(r.headers.get('retry-after')) * 1000 || Math.min(60000, 4000 * consecutive429);
           nextAllowedAt = Date.now() + wait;
+          if (/daily|per day|quota|credits/i.test(body)) {
+            const e = new Error(`OpenRouter: the day's free allowance is used up. ${detail(body)}`);
+            e.rateLimited = true;
+            throw e;
+          }
+          if (attempt >= 5) {
+            const e = new Error(`OpenRouter is rate limiting this key (${r.status}). ${detail(body)}`);
+            e.rateLimited = true;
+            throw e;
+          }
+          onProgress?.(`rate limited, waiting ${Math.round(wait / 1000)}s (attempt ${attempt + 1})`);
           continue;
         }
+        consecutive429 = 0;
+        backoff = Math.max(1, backoff * 0.9);   // ease back towards the asked-for pace
         if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${detail(await r.text())}`);
 
         const json = await r.json();
@@ -156,13 +181,22 @@ export function createOpenRouterEngine(modelId, { onProgress, minIntervalMs = 35
     },
   };
 
-  // The free tier counts requests, and a turn is several. Keep a floor between them so a
-  // run paces itself instead of being throttled.
+  // The free tier counts requests, so a long run has to keep a floor between them. The
+  // floor is whatever the requests-per-minute dial says, widened by any backoff the
+  // service has taught us.
   async function pace() {
+    const rpm = Math.max(1, getRpm() || 15);
+    const floor = (60000 / rpm) * backoff;
     const wait = nextAllowedAt - Date.now();
-    if (wait > 0) await new Promise(r => setTimeout(r, wait));
-    nextAllowedAt = Date.now() + minIntervalMs;
+    if (wait > 0) {
+      onProgress?.(`waiting ${(wait / 1000).toFixed(1)}s`);
+      await new Promise(r => setTimeout(r, wait));
+    }
+    nextAllowedAt = Date.now() + floor;
   }
+
+  // How long a turn will have to wait before it may go, for the page to show.
+  self.waitMs = () => Math.max(0, nextAllowedAt - Date.now());
 
   return self;
 }

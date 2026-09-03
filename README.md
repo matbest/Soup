@@ -180,6 +180,14 @@ Hence two switches that look like fussiness and are not:
   tier is rate limited so the soup runs at the API's pace, and a cell's text leaves the
   machine. The key is the visitor's own, kept in their browser's localStorage; there is
   none in this repo and a published copy must ask each visitor for theirs.
+  A long run has to pace itself: the **requests/min** dial sets the floor between calls,
+  and in vi mode a turn is one request, so it is turns per minute. Every refusal widens
+  that gap by half again and each success narrows it, so a run finds the pace the service
+  will accept rather than being cut off. `Retry-After` is honoured. Running out of the
+  day's free allowance pauses the run and saves it rather than failing, so it can be
+  picked up later with nothing lost. The status line shows the key's remaining allowance
+  and the rate limit the service reports.
+
   `cohere/north-mini-code:free` is the default whenever a key is stored: a code model is
   the right shape for an instruction set made of keystrokes, it is free with a long
   context, and a hosted model has no GPU watchdog to trip. Without a key the page falls

@@ -14,7 +14,7 @@ const $ = id => document.getElementById(id);
 
 // Copy noise is the mutation rate, and at zero there is no evolution: every copy is
 // exact, so nothing varies and nothing can be selected. It is on by default.
-const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, steps: 1 };
+const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, rpm: 12, steps: 1 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -29,7 +29,7 @@ const ancestor = () => $('ancestor').value.trim();
 async function makeEngine(name) {
   const onProgress = t => { $('status').textContent = t; };
   const e = name === 'mock' ? createMockEngine()
-    : name.startsWith(PREFIX) ? createOpenRouterEngine(name.slice(PREFIX.length), { onProgress })
+    : name.startsWith(PREFIX) ? createOpenRouterEngine(name.slice(PREFIX.length), { onProgress, getRpm: () => opts.rpm })
     : createWebLLMEngine(name, { onProgress });
   setBusy(true);
   $('status').textContent = `loading ${e.name}`;
@@ -251,6 +251,14 @@ async function loop() {
         // A GPU reset need not end the run: rebuild the engine and keep going. The soup
         // itself is untouched, only the model's device state died.
         if (err?.deviceLost && await recoverEngine()) continue;
+        // Being rate limited is not a failure either — the run stops where it is and the
+        // soup keeps its state, so it can be started again later without losing anything.
+        if (err?.rateLimited) {
+          running = false;
+          $('status').textContent = `paused: ${err.message}`;
+          save();
+          break;
+        }
         running = false;
         failed(err);
         break;
@@ -367,6 +375,7 @@ async function init() {
   bind('calls', 'calls');
   bind('keyLimit', 'keyLimit');
   bind('allowance', 'allowance');
+  bind('rpm', 'rpm');
   bind('budget', 'budget');
   $('grammar').checked = opts.grammar;
   $('grammar').addEventListener('change', () => { opts.grammar = $('grammar').checked; });
