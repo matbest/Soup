@@ -8,7 +8,7 @@ neighbours, and gives it a fixed slice of output tokens. The host then parses th
 for a single `WRITE` block and copies its body into the named neighbour, overwriting
 whatever was there. That is the whole machine.
 
-## Rules (v1, the current build)
+## Rules (v1, tagged `v1`)
 
 - Grid is a torus. Neighbourhood is N/E/S/W.
 - Two instructions, as JSON:
@@ -35,7 +35,7 @@ whatever was there. That is the whole machine.
 - The scheduler sweeps all occupied cells in a random order, one cell per tick, then
   reshuffles. A cell written mid-sweep runs its new genome when its turn comes.
 
-## Design (v2, agreed 2026-09-03, not yet built)
+## Design (v2, the current build)
 
 The cell is a document, and the document is the whole program.
 
@@ -128,7 +128,8 @@ ES modules will not load from file://.
 ## Phases
 
 1. Soup + mock engine. Done.
-2. Real model via WebLLM, constrained decoding, host-side mutation. Done.
+2. Real model via WebLLM, constrained decoding, host-side mutation. Done (tagged `v1`).
+2b. v2: cell as document, slots, structural-tag actions, editor verbs. Built.
 3. Neighbours' genomes become visible in the observation: the parasite threshold.
 4. Explicit conservation: energy balances, inference debits, reproduction splits.
 5. Instrumentation: lineage tree, genome length over time, diversity.

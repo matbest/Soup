@@ -1,6 +1,6 @@
-import { at, coords, neighbourCoords, occupiedIndices, place, clear, DIR_NAMES } from './soup.js';
-import { parseAction, ACTION_SCHEMA } from './parse.js';
-import { mutate } from './mutate.js';
+import { at, coords, occupiedIndices, neighbourCoords, DIR_NAMES } from './soup.js';
+import { buildMessages, makeSlots } from './document.js';
+import { execute, STRUCTURAL_TAG, MANUAL } from './actions.js';
 
 // Tierra's slicer, minus the reaper. Sweeps every occupied cell once in a random order,
 // one cell per tick, then reshuffles. `opts` is read live so the UI can change it mid-run.
@@ -22,15 +22,15 @@ export function createScheduler(soup, engine, opts) {
     }
     const cell = soup.cells[i];
     const [x, y] = coords(soup, i);
-    const obs = observe(soup, x, y);
+    const { messages, slots } = prompt(soup, x, y, cell.md, opts);
     active = i;
     let out;
     try {
       out = await engine.complete({
-        system: cell.md,
-        user: renderObs(obs),
-        obs,
-        schema: ACTION_SCHEMA,
+        messages,
+        doc: cell.md,
+        slots,
+        structuralTag: STRUCTURAL_TAG,
         maxTokens: opts.maxTokens,
         temperature: opts.temperature,
       });
@@ -39,26 +39,10 @@ export function createScheduler(soup, engine, opts) {
     }
     soup.tick++;
     cell.turns++;
-    const ev = { tick: soup.tick, x, y, out, act: null, usage: engine.lastUsage ?? null };
-    const a = parseAction(out);
-    if (!a) {
-      cell.fails++;
-    } else {
-      const [tx, ty] = neighbourCoords(soup, x, y, a.dir);
-      const overwrote = at(soup, tx, ty).md !== null;
-      if (a.action === 'copy') {
-        const md = mutate(cell.md, opts.noise);
-        place(soup, tx, ty, md, { gen: cell.gen + 1 });
-        ev.act = { action: 'copy', dir: a.dir, x: tx, y: ty, mutated: md !== cell.md, overwrote };
-      } else if (a.text) {
-        place(soup, tx, ty, a.text, { gen: cell.gen + 1 });
-        ev.act = { action: 'write', dir: a.dir, x: tx, y: ty, mutated: a.text !== cell.md, overwrote };
-      } else {
-        clear(soup, tx, ty);                   // writing nothing empties the cell
-        ev.act = { action: 'clear', dir: a.dir, x: tx, y: ty, mutated: false, overwrote };
-      }
-    }
-    cell.last = ev;
+    const { text, effects } = execute(soup, x, y, out, { noise: opts.noise });
+    if (effects.length === 0) cell.fails++;
+    const ev = { tick: soup.tick, x, y, out, text, effects, usage: engine.lastUsage ?? null };
+    soup.cells[i].last = ev;   // whoever now occupies the cell, possibly a replacement
     log.push(ev);
     if (log.length > 500) log.shift();
     return ev;
@@ -67,24 +51,16 @@ export function createScheduler(soup, engine, opts) {
   return { step, log, get active() { return active; } };
 }
 
-// What a cell is told. Neighbours as two lists (small models pattern-match a list far
-// better than a sentence), and the example direction letters rotated every turn so the
-// example cannot anchor the choice.
-export function observe(soup, x, y) {
-  const empty = [], occupied = [];
+// Everything the model will see for the cell at (x, y): its own document, with the slots
+// it carries expanded. Nothing else.
+export function prompt(soup, x, y, doc, opts) {
+  const neighbours = {};
   for (const d of DIR_NAMES) {
     const [nx, ny] = neighbourCoords(soup, x, y, d);
-    (at(soup, nx, ny).md === null ? empty : occupied).push(d);
+    neighbours[d] = at(soup, nx, ny).md;
   }
-  const ex = shuffle([...DIR_NAMES]);
-  return { x, y, empty, occupied, example: [ex[0], ex[1]] };
-}
-
-export function renderObs(o) {
-  const list = a => (a.length ? a.join(', ') : 'none');
-  return `You are the cell at (${o.x}, ${o.y}). Empty adjacent cells: ${list(o.empty)}. Occupied adjacent cells: ${list(o.occupied)}.\n` +
-    'Actions: copy your instructions into an adjacent cell, or write text into one. D is the direction: N, E, S or W. ' +
-    `Reply with one JSON object, for example {"action":"copy","dir":"${o.example[0]}"} or {"action":"write","dir":"${o.example[1]}","text":"hello"}.`;
+  const slots = makeSlots({ doc, x, y, neighbours, tokens: opts.maxTokens, manual: MANUAL });
+  return { messages: buildMessages(doc, slots), slots };
 }
 
 function shuffle(a) {

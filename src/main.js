@@ -1,6 +1,5 @@
 import { createSoup, place, stats, snapshot, coords } from './soup.js';
-import { createScheduler, renderObs } from './scheduler.js';
-import { parseAction, ACTION_SCHEMA } from './parse.js';
+import { createScheduler } from './scheduler.js';
 import { createMockEngine } from './engine-mock.js';
 import { createWebLLMEngine, MODELS } from './engine-webllm.js';
 import { createView } from './view.js';
@@ -8,7 +7,7 @@ import { estimateTokens } from './tokens.js';
 
 const $ = id => document.getElementById(id);
 
-const opts = { maxTokens: 60, temperature: 0.7, noise: 0.002, ticksPerFrame: 20 };
+const opts = { maxTokens: 300, temperature: 0.7, noise: 0, ticksPerFrame: 20 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -68,6 +67,14 @@ function usageText(u) {
   return u ? `  (${u.prompt_tokens} in, ${u.completion_tokens} out)` : '';
 }
 
+function describe(ev) {
+  if (!ev.effects.length) return `t${ev.tick}: no action`;
+  return `t${ev.tick}: ` + ev.effects.map(e =>
+    `${e.verb} ${e.target}${e.target === 'self' ? '' : ` (${e.x}, ${e.y})`}` +
+    (e.ok === false ? ' [no match]' : '') + (e.mutated ? ' [mutated]' : '') + (e.overwrote && e.verb === 'place' ? ' [overwrote]' : '')
+  ).join(', ');
+}
+
 function showCell(i) {
   if (i === null) { $('cell-head').textContent = 'click a cell'; $('genome').value = ''; $('output').textContent = ''; return; }
   const c = soup.cells[i];
@@ -77,39 +84,41 @@ function showCell(i) {
   $('genome').value = c.md;
   const ev = c.last;
   if (!ev) { $('output').textContent = 'has not taken a turn yet'; return; }
-  const a = ev.act;
-  const head = a
-    ? `t${ev.tick}: ${a.action} ${a.dir} to (${a.x}, ${a.y})${a.mutated ? ' [mutated]' : ''}${a.overwrote ? ' [overwrote]' : ''}`
-    : `t${ev.tick}: no valid action`;
-  $('output').textContent = head + usageText(ev.usage) + '\n\n' + ev.out;
+  $('output').textContent = describe(ev) + usageText(ev.usage) + '\n\n' + ev.out;
 }
 
-// Run the current ancestor a few times against a neighbourhood with one empty cell and
-// report whether it produces a valid action and whether it chose that cell. The tuning loop.
+// Echo fidelity. Put the current ancestor alone in a scratch grid, give it one turn with
+// the real engine, and report what it did and how faithfully it reproduced its text.
 async function probe() {
   if (busy || running) return;
   setBusy(true);
-  const md = ancestor();
-  const obs = { x: 6, y: 6, empty: ['S'], occupied: ['N', 'E', 'W'], example: ['E', 'W'] };
-  const K = 3;
-  let valid = 0, right = 0;
-  const acts = [];
+  $('probe-v').textContent = 'running';
   try {
-    for (let k = 0; k < K; k++) {
-      $('probe-v').textContent = `${k + 1}/${K}`;
-      const out = await engine.complete({ system: md, user: renderObs(obs), obs, schema: ACTION_SCHEMA, maxTokens: opts.maxTokens, temperature: opts.temperature });
-      const a = parseAction(out);
-      if (a) valid++;
-      if (a && a.dir === 'S') right++;
-      acts.push(a ? `${a.action} ${a.dir}${a.action === 'write' ? ` "${a.text}"` : ''}` : `invalid: ${out.slice(0, 60)}`);
-      $('cell-head').textContent = `probe: ${valid}/${k + 1} valid, ${right}/${k + 1} chose the empty cell${usageText(engine.lastUsage)}`;
-      $('genome').value = md;
-      $('output').textContent = renderObs(obs) + '\n\n' + acts.join('\n');
-    }
+    const md = ancestor();
+    const scratch = createSoup(3, 3);
+    place(scratch, 1, 1, md);
+    const sc = createScheduler(scratch, engine, opts);
+    const t0 = performance.now();
+    const ev = await sc.step();
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    const exact = ev.text === md;
+    const sim = similarity(md, ev.text);
+    const fidelity = exact ? 'exact' : `${(sim * 100).toFixed(0)}% of lines kept`;
+    $('probe-v').textContent = `${fidelity}, ${ev.effects.length} call${ev.effects.length === 1 ? '' : 's'}, ${secs}s`;
+    $('cell-head').textContent = `probe: echo ${fidelity}${usageText(ev.usage)}  ${secs}s`;
+    $('genome').value = md;
+    $('output').textContent = describe(ev) + '\n\n' + ev.out;
   } finally {
-    $('probe-v').textContent = `${valid}/${K} valid, ${right}/${K} right`;
     setBusy(false);
   }
+}
+
+// Fraction of the original's lines that appear verbatim in the copy.
+function similarity(original, copy) {
+  const lines = original.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return 0;
+  const have = new Set(copy.split('\n').map(l => l.trim()));
+  return lines.filter(l => have.has(l)).length / lines.length;
 }
 
 // Yields on a timer, not requestAnimationFrame, so a soup left running in a background
@@ -221,4 +230,4 @@ function animate() {
 init();
 
 // Debug hook for in-page experiments (ancestor tuning from the console).
-window.__soup = { get engine() { return engine; }, get soup() { return soup; }, opts };
+window.__soup = { get engine() { return engine; }, get soup() { return soup; }, get sched() { return sched; }, opts };

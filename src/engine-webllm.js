@@ -5,7 +5,7 @@ import { charBudget } from './tokens.js';
 // HuggingFace on first load and cached by the browser after that.
 //
 // The slice is enforced natively: max_tokens is the model's own budget, so the model
-// simply stops when it is spent, and a copy cut off before END is not a copy.
+// simply stops when it is spent, and a reply cut off before its tool call does nothing.
 const WEBLLM_URL = 'https://esm.run/@mlc-ai/web-llm@0.2.84';
 
 // Roughly in order of size. VRAM is WebLLM's own estimate.
@@ -39,13 +39,10 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
         initProgressCallback: p => onProgress?.(p.text),
       });
     },
-    async complete({ system, user, schema, maxTokens, temperature }) {
+    async complete({ messages, structuralTag, maxTokens, temperature }) {
       const r = await engine.chat.completions.create({
-        response_format: schema ? { type: 'json_object', schema } : undefined,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
+        response_format: structuralTag ? { type: 'structural_tag', structural_tag: structuralTag } : undefined,
+        messages,
         max_tokens: maxTokens,
         temperature,
         top_p: 1,
