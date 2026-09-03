@@ -67,18 +67,48 @@ export const TOOLS = [
 
 const TOOL_NAMES = new Set(CALL_SCHEMA.anyOf.map(c => c.properties.tool.enum[0]));
 
-// Read a reply. Without the grammar (the mock, a cut-off reply) this may find nothing.
+// Read a reply. Without the grammar the shape is whatever the model felt like, so accept
+// the shapes models actually produce: our own; {"name","arguments"} as they were trained
+// on; {"read_file": {...}} keyed by tool; "tool" followed by an args object; a bare
+// array. Anything else, or a cut-off reply, is a turn that does nothing.
 export function parseReply(text) {
   let o = null;
   try { o = JSON.parse(text); } catch {
-    const a = text.indexOf('{'), b = text.lastIndexOf('}');
+    const a = text.search(/[{[]/), b = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
     if (a >= 0 && b > a) { try { o = JSON.parse(text.slice(a, b + 1)); } catch { /* not a reply */ } }
   }
-  const calls = [];
-  if (o && Array.isArray(o.calls)) {
-    for (const c of o.calls) if (c && typeof c === 'object' && TOOL_NAMES.has(c.tool)) calls.push(c);
+  const list = Array.isArray(o) ? o
+    : o && typeof o === 'object' ? (o.calls ?? o.tool_calls ?? o.actions ?? (TOOL_NAMES.has(o.tool ?? o.name) ? [o] : []))
+    : [];
+  return { thoughts: typeof o?.thoughts === 'string' ? o.thoughts : '', calls: normalise(Array.isArray(list) ? list : []) };
+}
+
+function normalise(list) {
+  const out = [];
+  const args = v => (typeof v === 'string' ? (() => { try { return JSON.parse(v); } catch { return {}; } })() : v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+  for (let i = 0; i < list.length; i++) {
+    const c = list[i];
+    if (typeof c === 'string' && TOOL_NAMES.has(c)) {
+      const next = list[i + 1];
+      if (next && typeof next === 'object' && !Array.isArray(next) && !TOOL_NAMES.has(next.tool ?? next.name)) { out.push({ tool: c, ...next }); i++; }
+      else out.push({ tool: c });
+      continue;
+    }
+    if (!c || typeof c !== 'object' || Array.isArray(c)) continue;
+    const name = TOOL_NAMES.has(c.tool) ? c.tool : TOOL_NAMES.has(c.name) ? c.name : TOOL_NAMES.has(c.function?.name) ? c.function.name : null;
+    if (name) {
+      const a = c.arguments ?? c.args ?? c.parameters ?? c.function?.arguments;
+      const { tool, name: _n, function: _f, arguments: _a, args: _g, parameters: _p, ...rest } = c;
+      out.push({ ...rest, ...args(a), tool: name });
+      continue;
+    }
+    const k = Object.keys(c).find(k => TOOL_NAMES.has(k));
+    if (k) {
+      const v = c[k];
+      out.push(typeof v === 'string' ? { tool: k, path: v } : { ...args(v), tool: k });
+    }
   }
-  return { thoughts: typeof o?.thoughts === 'string' ? o.thoughts : '', calls };
+  return out;
 }
 
 // Run one call from the cell at (x, y). Returns { ok, output, effect? }; `effect` is the
