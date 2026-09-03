@@ -92,6 +92,21 @@ export function stats(soup) {
   };
 }
 
+// Put a snapshot back. Anything missing from an older file takes its default, so a
+// saved soup keeps working as the format grows.
+export function restore(data) {
+  const soup = createSoup(data.w, data.h);
+  soup.tick = data.tick ?? 0;
+  soup.sweep = data.sweep ?? 0;
+  (data.cells || []).forEach((c, i) => {
+    if (!c || c.md == null || i >= soup.cells.length) return;
+    Object.assign(soup.cells[i], emptyCell(), {
+      md: c.md, gen: c.gen ?? 0, born: c.born ?? 0, turns: c.turns ?? 0, fails: c.fails ?? 0,
+    });
+  });
+  return soup;
+}
+
 export function snapshot(soup) {
   return JSON.stringify({
     w: soup.w, h: soup.h, tick: soup.tick, sweep: soup.sweep,

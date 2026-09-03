@@ -1,4 +1,4 @@
-import { createSoup, place, stats, snapshot, coords } from './soup.js';
+import { createSoup, place, stats, snapshot, restore, coords } from './soup.js';
 import { createScheduler, prompt } from './scheduler.js';
 import { setTools } from './tools.js';
 import { createMockEngine } from './engine-mock.js';
@@ -173,12 +173,15 @@ async function loop() {
     view.draw();
     showStats();
     if (view.selected !== null) showCell(view.selected);
+    if (soup.tick - lastSaveTick >= 20) { lastSaveTick = soup.tick; save(); }
     await yieldToBrowser();
   }
+  save();
   $('run').textContent = 'Run';
 }
 
 let recoveries = 0;
+let lastSaveTick = 0;
 
 async function recoverEngine() {
   if (!engine.recover || recoveries >= 5) return false;
@@ -287,6 +290,7 @@ async function init() {
       showStats();
       if (ev) view.select(ev.y * soup.w + ev.x);
       else $('status').textContent = 'soup is dead';
+      save();
     } catch (err) {
       failed(err);
     } finally {
@@ -302,6 +306,19 @@ async function init() {
     engine = await makeEngine($('engine').value);
     if (old !== engine) await old.unload?.();   // never leave two models on the GPU
     reset();
+  });
+  $('load').addEventListener('click', () => $('loadfile').click());
+  $('loadfile').addEventListener('change', async () => {
+    const file = $('loadfile').files[0];
+    if (!file) return;
+    await stop();
+    try {
+      loadDump(JSON.parse(await file.text()));
+      $('status').textContent = `loaded ${file.name}`;
+    } catch (err) {
+      failed(err);
+    }
+    $('loadfile').value = '';
   });
   $('export').addEventListener('click', () => {
     // The transcripts, not just the grid: what a turn did and did not do is the evidence.
@@ -339,6 +356,45 @@ async function loadFreeModels() {
     $('or-note').textContent = `${models.length} free models, ${models.filter(m => m.schema).length} that can be held to the schema`;
   } catch (err) {
     $('or-note').textContent = err.message;
+  }
+}
+
+// Everything a run knows, in one object: the grid, the settings, and the recent turns.
+// Saved to the dev server so a soup can be reloaded, read and worked on off the page.
+function dump() {
+  return {
+    saved: new Date().toISOString(),
+    engine: engine.name,
+    opts,
+    stats: stats(soup),
+    soup: JSON.parse(snapshot(soup)),
+    turns: sched.log.slice(-40),
+  };
+}
+
+function loadDump(data) {
+  const s = data?.soup ?? data;
+  if (!s?.w || !Array.isArray(s.cells)) throw new Error('not a soup snapshot');
+  soup = restore(s);
+  sched = createScheduler(soup, engine, opts);
+  if ([...$('size').options].some(o => Number(o.value) === soup.w)) $('size').value = String(soup.w);
+  view.clear();
+  view.draw();
+  showStats();
+  showCell(null);
+}
+
+// The dev server takes POST /save/<name>; a published copy does not, so a failure here is
+// not worth reporting more than once.
+let saveBroken = false;
+async function save(name = 'latest.json') {
+  if (saveBroken) return;
+  try {
+    const r = await fetch(`/save/${name}`, { method: 'POST', body: JSON.stringify(dump(), null, 2) });
+    if (!r.ok) throw new Error(`${r.status}`);
+  } catch {
+    saveBroken = true;
+    console.info('[soup] no save endpoint; run `python serve.py` to keep runs on disk');
   }
 }
 

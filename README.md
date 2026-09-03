@@ -154,6 +154,18 @@ Hence two switches that look like fussiness and are not:
 - `webllm`: a small instruct model over WebGPU, loaded in the page and cached by the
   browser. Qwen2.5-0.5B is the working floor; the status line shows which GPU it got.
 
+## Runs on disk
+
+While `serve.py` is running, the page saves the whole run to `runs/latest.json` every 20
+ticks, after every Step, and whenever a Run stops: the grid, the settings, the statistics,
+and the last 40 turns with their full transcripts. That is the file to read when you want
+to know why a cell did what it did, and **Load** puts a saved soup back so a run can be
+continued rather than restarted. **Export** writes the same object to your downloads.
+
+The endpoint is `POST /save/<name>.json`, which only this development server offers; a
+published copy of the page has none, so saving quietly does nothing and the run is
+otherwise unaffected.
+
 ## Run
 
 `python serve.py` in this directory, then open http://localhost:8765/. It is a plain static
