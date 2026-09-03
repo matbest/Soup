@@ -3,6 +3,7 @@ import * as tools from './tools.js';
 const { READS, parseReply, runCall, renderResults } = tools;
 
 const SCHEMA = JSON.stringify(tools.REPLY_SCHEMA);
+const WRITE_ONLY = JSON.stringify(tools.WRITE_SCHEMA);
 
 // Tierra's slicer, minus the reaper. Sweeps every occupied cell once in a random order,
 // one cell per tick, then reshuffles. `opts` is read live so the UI can change it mid-run.
@@ -30,14 +31,19 @@ export function createScheduler(soup, engine, opts) {
     const [x, y] = coords(soup, i);
     const messages = prompt(cell.md);
     const ev = { tick: 0, x, y, rounds: [], effects: [], usage: { prompt_tokens: 0, completion_tokens: 0 } };
+    const last = Math.max(1, opts.rounds) - 1;
+    let repeated = false;
     try {
-      for (let r = 0; r < Math.max(1, opts.rounds); r++) {
+      for (let r = 0; r <= last; r++) {
         active = i;
         let out;
+        // The last round, or one that just repeated itself, cannot read: small models will
+        // otherwise list the files over and over and never act.
+        const writeOnly = r === last || repeated;
         try {
           // Under the grammar the reply cannot be malformed. Without it, a reply the parser
           // cannot read is a turn that does nothing, and was paid for.
-          out = await engine.complete({ messages, schema: opts.grammar ? SCHEMA : null, maxTokens: opts.maxTokens, temperature: opts.temperature });
+          out = await engine.complete({ messages, schema: opts.grammar ? (writeOnly ? WRITE_ONLY : SCHEMA) : null, maxTokens: opts.maxTokens, temperature: opts.temperature });
         } finally {
           active = null;
         }
@@ -48,6 +54,7 @@ export function createScheduler(soup, engine, opts) {
         ev.rounds.push({ out, thoughts, calls, results });
         for (const res of results) if (res.effect) ev.effects.push(res.effect);
         if (!calls.some(c => READS.has(c.tool))) break;
+        repeated = ev.rounds.length > 1 && sameCalls(calls, ev.rounds[ev.rounds.length - 2].calls);
         messages.push({ role: 'assistant', content: out }, { role: 'user', content: renderResults(calls, results) });
       }
     } finally {
@@ -71,6 +78,10 @@ export function prompt(md) {
     { role: 'system', content: '' },
     { role: 'user', content: `${md}\n\n${tools.TOOLS}` },
   ];
+}
+
+function sameCalls(a, b) {
+  return a.length === b.length && a.every((c, i) => JSON.stringify(c) === JSON.stringify(b[i]));
 }
 
 function shuffle(a) {

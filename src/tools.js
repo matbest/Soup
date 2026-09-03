@@ -46,15 +46,21 @@ export const CALL_SCHEMA = {
   ],
 };
 
-export const REPLY_SCHEMA = {
+const reply = items => ({
   type: 'object',
-  properties: {
-    thoughts: str,
-    calls: { type: 'array', items: CALL_SCHEMA, minItems: 1 },
-  },
+  properties: { thoughts: str, calls: { type: 'array', items, minItems: 1 } },
   required: ['calls'],
   additionalProperties: false,
-};
+});
+
+export const REPLY_SCHEMA = reply(CALL_SCHEMA);
+
+// The same, minus the reads. A turn's last round uses this, so a cell that spends its
+// whole turn looking around still has to do something with what it saw. Looking is not
+// free and it is not unlimited: the slice runs out.
+export const WRITE_SCHEMA = reply({
+  anyOf: CALL_SCHEMA.anyOf.filter(c => !READS.has(c.properties.tool.enum[0])),
+});
 
 // Shown after every cell's text, verbatim. Two sizes, because prefill is one GPU dispatch
 // and its cost scales with prompt length: on a small card a long prompt can run past the
