@@ -190,8 +190,8 @@ function bind(id, key) {
 async function init() {
   for (const m of MODELS) {
     const o = document.createElement('option');
-    o.value = m;
-    o.textContent = m.replace(/-(Instruct-)?q\w+-MLC$/, '');
+    o.value = m.id;
+    o.textContent = `${m.id.replace(/-(Instruct-)?q\w+-MLC$/, '')}  ~${(m.vram / 1024).toFixed(1)} GB`;
     $('engine').appendChild(o);
   }
   $('ancestor').value = (await (await fetch('./ancestor.md')).text()).trim();
