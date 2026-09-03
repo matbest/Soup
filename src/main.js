@@ -100,7 +100,14 @@ async function probe() {
     place(scratch, 1, 1, md);
     const sc = createScheduler(scratch, engine, opts);
     const t0 = performance.now();
-    const ev = await sc.step();
+    let ev;
+    try {
+      ev = await sc.step();
+    } catch (err) {
+      $('probe-v').textContent = 'failed';
+      failed(err);
+      return;
+    }
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
     const exact = ev.text === md;
     const sim = similarity(md, ev.text);
@@ -132,7 +139,14 @@ async function loop() {
     for (let k = 0; k < per && running; k++) {
       inFlight = sched.step();
       view.draw();   // show the working mark now, even where animation frames are paused
-      const ev = await inFlight.finally(() => { inFlight = null; });
+      let ev;
+      try {
+        ev = await inFlight.finally(() => { inFlight = null; });
+      } catch (err) {
+        running = false;
+        failed(err);
+        break;
+      }
       if (!ev) { running = false; $('status').textContent = 'soup is dead'; break; }
     }
     view.draw();
@@ -141,6 +155,14 @@ async function loop() {
     await yieldToBrowser();
   }
   $('run').textContent = 'Run';
+}
+
+// A turn that throws (the engine, the grammar, the GPU) must say so on the page, not
+// just in the console, or a stopped spinner is the only sign.
+function failed(err) {
+  $('status').textContent = `turn failed: ${err?.message ?? err}`;
+  console.error('[soup] turn failed', err);
+  view.draw();
 }
 
 // Stop the loop and wait for any turn already at the model, so a reset or engine swap
@@ -199,6 +221,9 @@ async function init() {
       view.draw();
       showStats();
       if (ev) view.select(ev.y * soup.w + ev.x);
+      else $('status').textContent = 'soup is dead';
+    } catch (err) {
+      failed(err);
     } finally {
       setBusy(false);
     }
