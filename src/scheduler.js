@@ -6,8 +6,18 @@ const { READS, parseReply, runCall, renderResults } = tools;
 
 const schemaFor = (writeOnly, n) => JSON.stringify(writeOnly ? tools.writeSchema(n) : tools.replySchema(n));
 
-// Tierra's slicer, minus the reaper. Sweeps every occupied cell once in a random order,
-// one cell per tick, then reshuffles. `opts` is read live so the UI can change it mid-run.
+// Tierra's slicer, minus the reaper. Sweeps the occupied cells in a random order, one
+// cell per tick, then reshuffles. `opts` is read live so the UI can change it mid-run.
+//
+// Compute is finite. Each sweep every living cell is given the same allowance of tokens,
+// which it keeps as credit, and a turn debits what it actually cost — the whole prompt
+// and the whole reply. While a cell is still in credit it goes again, so a cheap genome
+// takes several turns in the time an expensive one takes none, and a genome dear enough
+// to overrun its allowance spends whole sweeps saving up for a single turn.
+//
+// Nothing is taken from anybody and nothing is decreed. The only rule is that compute
+// spent is compute gone. Tierra's slicer allotted time by creature size, and its ancestor
+// shrank from 80 instructions to 36.
 //
 // A tick is one cell's turn, and a turn is a small agent loop: the cell's text and the
 // TOOLS go to the model; its calls run; if any were reads, the results go back and it
@@ -19,14 +29,25 @@ export function createScheduler(soup, engine, opts) {
 
   async function step() {
     let i = -1;
+    let looked = 0;
     while (i < 0) {
       if (queue.length === 0) {
-        queue = shuffle(occupiedIndices(soup));
-        if (queue.length === 0) return null;   // the soup is dead
+        const living = occupiedIndices(soup);
+        if (living.length === 0) return null;   // the soup is dead
         soup.sweep++;
+        soup.spent = 0;
+        soup.income = opts.allowance > 0 ? opts.allowance : 0;
+        if (soup.income) for (const j of living) soup.cells[j].credit += soup.income;
+        soup.starved = soup.income ? living.filter(j => soup.cells[j].credit <= 0).length : 0;
+        queue = shuffle(living);
+        // Nobody can afford a turn yet: let the sweeps pass until somebody can.
+        if (soup.income && ++looked > 5000) return null;
       }
       const j = queue.pop();
-      if (soup.cells[j].md !== null) i = j;    // may have been cleared since the shuffle
+      const c = soup.cells[j];
+      if (c.md === null) continue;                            // cleared since the shuffle
+      if (opts.allowance > 0 && c.credit <= 0) continue;      // in debt: saving up
+      i = j;
     }
     const cell = soup.cells[i];
     const [x, y] = coords(soup, i);
@@ -59,6 +80,10 @@ export function createScheduler(soup, engine, opts) {
         }
         const u = engine.lastUsage;
         if (u) { ev.usage.prompt_tokens += u.prompt_tokens ?? 0; ev.usage.completion_tokens += u.completion_tokens ?? 0; }
+        const cost = (u?.prompt_tokens ?? 0) + (u?.completion_tokens ?? 0);
+        soup.spent += cost;
+        cell.credit -= cost;
+        if (r === last) requeue(i);
         const { thoughts, calls } = parseReply(out);
         const results = calls.map(c => runCall(soup, x, y, c, { noise: opts.noise, readLimit: opts.readLimit }));
         ev.rounds.push({ out, thoughts, calls, results, finish: engine.lastFinish ?? null, reasoning: engine.lastReasoning || '' });
@@ -79,6 +104,11 @@ export function createScheduler(soup, engine, opts) {
     return ev;
   }
 
+  // A cell that has not spent its allowance goes again this sweep, behind everyone else.
+  function requeue(i) {
+    if (opts.allowance > 0 && soup.cells[i].md !== null && soup.cells[i].credit > 0) queue.unshift(i);
+  }
+
   // A vi turn: one call, and whatever comes back is run as keystrokes over the grid.
   async function viStep(i, cell, x, y) {
     const messages = viPrompt(cell.md);
@@ -91,6 +121,10 @@ export function createScheduler(soup, engine, opts) {
     }
     soup.tick++;
     cell.turns++;
+    const cost = (engine.lastUsage?.prompt_tokens ?? 0) + (engine.lastUsage?.completion_tokens ?? 0);
+    soup.spent += cost;
+    cell.credit -= cost;
+    requeue(i);
     const r = viTurn(soup, x, y, out, { noise: opts.noise, keyLimit: opts.keyLimit ?? 400 });
     if (!r.effects.length) cell.fails++;
     const ev = {

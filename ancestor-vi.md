@@ -1,5 +1,5 @@
 ```
-gg yG   L   gg VG p
+gg yG   R   gg VG p
 ```
 
 Reply with exactly the block above, and nothing else.
@@ -12,15 +12,18 @@ line breaks between keys are ignored, so the keys may be written spread out
 and are easier to copy that way.
 
 Those keys are how a cell reproduces. `gg yG` goes to the top and yanks the
-whole file. `L` moves one whole cell east. `gg VG p` goes to the top there,
-selects everything, and pastes this file over it. The cell to the east
-becomes a copy of this one, and on its own turn it will read itself and do
-the same.
+whole file. `R` moves one whole cell in a random direction. `gg VG p` goes
+to the top there, selects everything, and pastes this file over it. That
+cell becomes a copy of this one, and on its own turn it will read itself
+and do the same.
 
-Other keys, if you ever want them: `h j k l` move the cursor; `H J K L` move
-one whole cell west, south, north, east; `i a o` insert and `<Esc>` stops
-inserting; `yy` yanks a line and `p P` paste; `V` starts a line selection,
-`d` deletes and `x` deletes one character.
+Other keys, if you ever want them: `h j k l` move the cursor; `H J K L`
+move one whole cell west, south, north, east; `i a o` insert and `<Esc>`
+stops inserting; `yy` yanks a line and `p P` paste; `V` starts a line
+selection, `d` deletes and `x` deletes one character.
+
+Every turn costs tokens, and a cell is given only so many. A shorter file
+costs less to run and so gets to run more often.
 
 Copying is imperfect, so a copy of this file may differ from it. What you
 are reading is whatever survived.

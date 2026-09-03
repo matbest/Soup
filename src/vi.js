@@ -15,8 +15,13 @@
 // Cursor position is part of a cell's state, so where a lineage leaves its cursor is
 // inherited along with its text.
 
-// Which way each key steps, in cells.
+// Which way each key steps, in cells. R steps to one of the four at random, so a genome
+// can reproduce without naming a direction — the way Tierra's allocator placed daughters
+// rather than the creature choosing. A lineage that always goes east fills one row of a
+// torus and then eats itself; one that goes R spreads.
 export const CELL_KEYS = { H: [-1, 0], J: [0, 1], K: [0, -1], L: [1, 0] };
+export const RANDOM_KEY = 'R';
+const DELTAS = Object.values(CELL_KEYS);
 
 const SPECIAL = { '<Esc>': 'Esc', '<CR>': 'CR', '<Enter>': 'CR', '<BS>': 'BS', '<Tab>': 'Tab', '<Space>': ' ' };
 
@@ -59,7 +64,7 @@ function makeBuffer(text, cursor) {
 //
 // `limit` caps how many keys are executed, so a runaway string costs what it costs and
 // then stops.
-export function run(getCell, input, { limit = 4000 } = {}) {
+export function run(getCell, input, { limit = 4000, rng = Math.random } = {}) {
   const bufs = new Map();
   const state = {
     dx: 0, dy: 0,
@@ -212,8 +217,8 @@ export function run(getCell, input, { limit = 4000 } = {}) {
 
     // One whole cell in that direction, and it keeps going: LL is two cells east. These
     // are the only way between cells, and each step costs a keystroke.
-    if (key in CELL_KEYS) {
-      const [ddx, ddy] = CELL_KEYS[key];
+    if (key in CELL_KEYS || key === RANDOM_KEY) {
+      const [ddx, ddy] = key === RANDOM_KEY ? DELTAS[Math.floor(rng() * DELTAS.length)] : CELL_KEYS[key];
       state.dx += ddx * n;
       state.dy += ddy * n;
       const nb = buf();

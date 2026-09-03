@@ -69,6 +69,22 @@ Every round re-sends the growing conversation: reading is paid for in prompt tok
 rounds. A missed anchor is an error in the results, so the model can read and retry
 within the turn.
 
+**Compute is finite.** Each sweep every living cell is given the same allowance of tokens
+(the *tokens/cell* dial; 0 means unlimited). A turn debits what it actually cost, the
+whole prompt and the whole reply. While a cell still has credit it goes again, so a cheap
+genome takes several turns in the time a dear one takes none, and a genome that overruns
+its allowance spends whole sweeps saving up for a single turn. Held still — five wordy
+cells and five terse ones, nobody reproducing — the terse ones ran about 22 times as
+often. Nothing is taken from anybody and nothing is decreed; the only rule is that compute
+spent is compute gone.
+
+**`R` moves one cell in a random direction**, so a genome can reproduce without naming a
+way to go. It matters more than it looks: `L` fills one row of the torus and then eats
+itself, 12 cells of 144 after 600 ticks, while `R` reaches 118. Tierra had the same
+property for the same reason — its allocator placed daughters, the creature never chose —
+and the only directional choice in its instruction set was whether a template search ran
+forward or backward.
+
 **Death.** `copy_file` and `create_file` over an occupied path replace it. `delete_file`
 empties it. A file can also be edited down to nothing. No reaper.
 

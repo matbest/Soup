@@ -9,6 +9,7 @@ import { run, CELL_KEYS, tokenize } from './vi.js';
 const $ = id => document.getElementById(id);
 
 const PRESETS = [
+  ['reproduce anywhere', 'gg yG R gg VG p'],
   ['reproduce east', 'ggyGLggVGp'],
   ['reproduce north', 'ggyGKggVGp'],
   ['reproduce two east', 'ggyG2LggVGp'],
@@ -31,10 +32,24 @@ export function createViLab() {
   let stepAt = null;   // how many keys to run; null means all of them
   let capturing = false;
 
+  // The bench re-runs the whole string on every change, so R has to land the same way
+  // each time or stepping through would show a different world at every keystroke. The
+  // seed is the string itself: edit it and the dice change too.
+  function seeded(text) {
+    let h = 1779033703;
+    for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 3432918353) >>> 0;
+    return () => {
+      h = (h + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(h ^ (h >>> 15), 1 | h);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
   const state = () => run(
     (dx, dy) => (start[`${dx},${dy}`] !== undefined ? { text: start[`${dx},${dy}`], cursor: { line: 0, col: 0 } } : null),
     keys,
-    { limit: stepAt === null ? 4000 : stepAt },
+    { limit: stepAt === null ? 4000 : stepAt, rng: seeded(keys) },
   );
 
   function render() {

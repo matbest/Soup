@@ -8,7 +8,7 @@ import { charBudget } from './tokens.js';
 const NEIGHBOURS = ['north', 'south', 'east', 'west'];
 
 export function createMockEngine({ rng = Math.random, chatter = 0.02 } = {}) {
-  return {
+  const self = {
     name: 'mock',
     instant: true,
     lastUsage: null,
@@ -28,6 +28,7 @@ export function createMockEngine({ rng = Math.random, chatter = 0.02 } = {}) {
           const i = Math.floor(rng() * keys.length);
           keys = keys.slice(0, i) + 'qzx'[Math.floor(rng() * 3)] + keys.slice(i + 1);
         }
+        self.lastUsage = { prompt_tokens: Math.ceil(promptText.length / 4), completion_tokens: Math.ceil(keys.length / 4) + 4 };
         return '```\n' + keys + '\n```';
       }
       let reply;
@@ -43,7 +44,10 @@ export function createMockEngine({ rng = Math.random, chatter = 0.02 } = {}) {
           : { calls: [{ tool: 'copy_file', src: 'self', dst }] };
       }
       // The slice. Run out of tokens and the reply is not a reply.
-      return JSON.stringify(reply).slice(0, charBudget(maxTokens));
+      const out = JSON.stringify(reply).slice(0, charBudget(maxTokens));
+      self.lastUsage = { prompt_tokens: Math.ceil(promptText.length / 4), completion_tokens: Math.ceil(out.length / 4) };
+      return out;
     },
   };
+  return self;
 }

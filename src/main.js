@@ -14,7 +14,7 @@ const $ = id => document.getElementById(id);
 
 // Copy noise is the mutation rate, and at zero there is no evolution: every copy is
 // exact, so nothing varies and nothing can be selected. It is on by default.
-const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, steps: 1 };
+const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, steps: 1 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -67,7 +67,8 @@ function reset() {
 function showStats() {
   const s = stats(soup);
   $('stats').textContent =
-    `tick ${s.tick}   sweep ${s.sweep}\n` +
+    `tick ${s.tick}   sweep ${s.sweep}` +
+    (opts.allowance > 0 ? `   ${Math.round(s.income)} tokens/cell/sweep${s.starved ? `, ${s.starved} in debt` : ''}` : '') + '\n' +
     `occupied ${s.occupied}/${s.total}   genomes ${s.distinct}   dominant ${s.dominant}\n` +
     `mean length ${s.meanLen.toFixed(0)} chars, about ${Math.ceil(s.meanLen / 4)} tokens\n` +
     `fail rate ${(s.failRate * 100).toFixed(1)}%`;
@@ -365,6 +366,7 @@ async function init() {
   bind('rounds', 'rounds');
   bind('calls', 'calls');
   bind('keyLimit', 'keyLimit');
+  bind('allowance', 'allowance');
   bind('budget', 'budget');
   $('grammar').checked = opts.grammar;
   $('grammar').addEventListener('change', () => { opts.grammar = $('grammar').checked; });

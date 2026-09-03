@@ -53,7 +53,7 @@ export function keystrokesFrom(reply) {
 }
 
 // Run one cell's turn. Returns what changed, for the log and the view.
-export function viTurn(soup, x, y, reply, { noise = 0, keyLimit = 400 } = {}) {
+export function viTurn(soup, x, y, reply, { noise = 0, keyLimit = 400, rng = Math.random } = {}) {
   const keys = keystrokesFrom(reply);
   const source = at(soup, x, y);
 
@@ -63,7 +63,7 @@ export function viTurn(soup, x, y, reply, { noise = 0, keyLimit = 400 } = {}) {
       return c.md === null ? null : { text: c.md, cursor: c.cursor };
     },
     keys,
-    { limit: keyLimit },
+    { limit: keyLimit, rng },
   );
 
   const effects = [];

@@ -114,6 +114,7 @@
         <label>copy noise <input id="noise" type="range" min="0" max="0.02" step="0.0005" value="0.002"><span id="noise-v"></span></label>
         <label>rounds/turn <input id="rounds" type="range" min="1" max="6" value="4"><span id="rounds-v"></span></label>
         <label>key limit <input id="keyLimit" type="range" min="20" max="1000" step="20" value="400"><span id="keyLimit-v"></span></label>
+        <label>tokens/cell <input id="allowance" type="range" min="0" max="4000" step="50" value="0" title="Tokens each living cell is given per sweep. A turn costs what it costs; a cell with credit left goes again, one in debt waits. 0 is unlimited."><span id="allowance-v"></span></label>
         <label>calls/round <input id="calls" type="range" min="1" max="6" value="1"><span id="calls-v"></span></label>
         <label>turn budget <input id="budget" type="range" min="400" max="4000" step="100" value="1200"><span id="budget-v"></span></label>
         <label>grammar <input id="grammar" type="checkbox" checked><span title="Constrained decoding: the reply can only be a valid tool call. Small models narrate instead of acting without it.">forces JSON</span></label>
@@ -185,6 +186,7 @@ a run paces itself. No GPU needed.</pre>
   <div id="vi-grid"></div>
   <pre class="box" id="vi-help">h j k l  0 ^ $  w b e  gg G  {count}       move the cursor inside a cell
 H J K L   2L   3K                          move one cell west / south / north / east, and keep going
+R                                          move one cell in a random direction
 i a I A o O   <Esc>                        insert
 x D r{ch}  dd dw d$ dG  cc cw C  2dd       delete and change
 yy Y ygg yG   p P                          yank and paste (one register, shared across cells)

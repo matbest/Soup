@@ -4,12 +4,17 @@ export const DIRS = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
 export const DIR_NAMES = Object.keys(DIRS);
 
 export function createSoup(w, h) {
-  return { w, h, tick: 0, sweep: 0, cells: Array.from({ length: w * h }, emptyCell) };
+  // `spent` is the compute this sweep has used, in tokens. Compute is finite, so what one
+  // cell spends is not there for another: that is the only thing they compete over apart
+  // from space.
+  return { w, h, tick: 0, sweep: 0, spent: 0, starved: 0, cells: Array.from({ length: w * h }, emptyCell) };
 }
 
 export function emptyCell() {
   // The cursor is part of a cell's state, so where a lineage leaves it is inherited.
-  return { md: null, gen: 0, born: 0, turns: 0, fails: 0, last: null, cursor: { line: 0, col: 0 } };
+  // `credit` is the compute a cell has saved up. A turn debits what it cost, so an
+  // expensive cell spends longer earning its next one.
+  return { md: null, gen: 0, born: 0, turns: 0, fails: 0, last: null, credit: 0, cursor: { line: 0, col: 0 } };
 }
 
 export function wrap(soup, x, y) {
@@ -45,6 +50,7 @@ export function place(soup, x, y, md, { gen = 0 } = {}) {
   c.fails = 0;
   c.last = null;
   c.cursor = { line: 0, col: 0 };
+  c.credit = 0;   // born owing nothing and owning nothing
   return c;
 }
 
@@ -85,6 +91,9 @@ export function stats(soup) {
   return {
     tick: soup.tick,
     sweep: soup.sweep,
+    spent: soup.spent ?? 0,
+    starved: soup.starved ?? 0,
+    income: soup.income ?? 0,
     occupied,
     total: soup.cells.length,
     distinct: genomes.size,
@@ -100,6 +109,7 @@ export function restore(data) {
   const soup = createSoup(data.w, data.h);
   soup.tick = data.tick ?? 0;
   soup.sweep = data.sweep ?? 0;
+  soup.spent = data.spent ?? 0;
   (data.cells || []).forEach((c, i) => {
     if (!c || c.md == null || i >= soup.cells.length) return;
     Object.assign(soup.cells[i], emptyCell(), {
@@ -126,7 +136,7 @@ export function population(soup, top = 6) {
 
 export function snapshot(soup) {
   return JSON.stringify({
-    w: soup.w, h: soup.h, tick: soup.tick, sweep: soup.sweep,
+    w: soup.w, h: soup.h, tick: soup.tick, sweep: soup.sweep, spent: soup.spent ?? 0,
     cells: soup.cells.map(c => ({ md: c.md, gen: c.gen, born: c.born, turns: c.turns, fails: c.fails })),
   });
 }
