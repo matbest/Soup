@@ -71,7 +71,7 @@ a key it has just read is the one edit a small model can do reliably.
 
     {"place":D}                          copy this document into D (host copy, with noise)
     {"place":D,"doc":{...}}              place the given document instead
-    {"set":D,"key":K,"value":V}          set field K of D
+    {"set":D,"key":K,"value":"V"}        set field K of D to the text V
     {"append":D,"key":K,"value":"T"}     add T to the end of text field K of D
     {"delete":D,"key":K}                 remove field K from D
     {"clear":D}                          empty D

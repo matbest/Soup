@@ -14,14 +14,16 @@ const TARGETS = [...DIR_NAMES, 'self'];
 const obj = (props, required) => ({ type: 'object', properties: props, required, additionalProperties: false });
 const target = { enum: TARGETS };
 const str = { type: 'string' };
-const any = {};
+// Field values are text. Arbitrary-JSON sub-grammars are the heaviest thing XGrammar can
+// be asked to compile, and the first compile on a fresh model is where it fell over.
+const textDoc = { type: 'object', additionalProperties: str };
 
 export const VERBS = ['place', 'set', 'append', 'delete', 'clear'];
 
 export const ACTION_SCHEMA = {
   anyOf: [
-    obj({ place: target, doc: { type: 'object' } }, ['place']),
-    obj({ set: target, key: str, value: any }, ['set', 'key', 'value']),
+    obj({ place: target, doc: textDoc }, ['place']),
+    obj({ set: target, key: str, value: str }, ['set', 'key', 'value']),
     obj({ append: target, key: str, value: str }, ['append', 'key', 'value']),
     obj({ delete: target, key: str }, ['delete', 'key']),
     obj({ clear: target }, ['clear']),
@@ -43,7 +45,7 @@ export const MANUAL = [
   'Reply with one JSON object: {"thoughts": "...", "actions": [ ... ]}. Thoughts are optional. Each action is one of:',
   '{"place":"D"}                         copies this document into cell D.',
   '{"place":"D","doc":{...}}             places the given document into cell D instead.',
-  '{"set":"D","key":"K","value":V}       sets field K of D to V.',
+  '{"set":"D","key":"K","value":"V"}     sets field K of D to the text V.',
   '{"append":"D","key":"K","value":"T"}  adds T to the end of the text field K of D.',
   '{"delete":"D","key":"K"}              removes field K from D.',
   '{"clear":"D"}                         empties cell D.',
@@ -93,7 +95,7 @@ export function execute(soup, x, y, reply, { noise = 0 } = {}) {
         if (!key) { ev.ok = false; break; }
         const doc = cell.md === null ? {} : parseDoc(cell.md);
         if (!doc) { ev.ok = false; break; }              // a document without structure has no fields
-        if (a.verb === 'set') doc[key] = a.value ?? '';
+        if (a.verb === 'set') doc[key] = String(a.value ?? '');
         else if (a.verb === 'append') {
           const add = String(a.value ?? '');
           const old = doc[key];
