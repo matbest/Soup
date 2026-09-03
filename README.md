@@ -211,6 +211,25 @@ Hence two switches that look like fussiness and are not:
 - `webllm`: a small instruct model over WebGPU, loaded in the page and cached by the
   browser. Qwen2.5-0.5B is the working floor; the status line shows which GPU it got.
 
+### On a slow card
+
+Prefill is one GPU dispatch, and Windows resets the card if a dispatch runs past two
+seconds. Measured on a Quadro T1000 driving a 1B model: about **99 prefill tokens a
+second**, so the watchdog allows roughly 200 prompt tokens and the full seed's 232 is
+already over the line. The card is not being throttled and the weights are in video
+memory — sampling it through a turn shows 100% utilisation at 1350 MHz of a 1530 MHz
+maximum, drawing 21 W, for about three seconds, and then the device goes. The work really
+does take that long, because WebGPU shaders cannot reach the card's tensor cores.
+
+`?seed=min` seeds a 49-token version of the same organism, which prefills in about half a
+second. Dropping the slice to 60 tokens shortens decode too. Neither changes the
+experiment: it is the same keystrokes and the same instruction set, with less prose around
+them.
+
+The real fix, if you want the larger models, is to raise the watchdog: a `TdrDelay` DWORD
+of 10 under `HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers`, and a reboot. That
+is a system-wide graphics setting, so it is not something this repo does for you.
+
 ## Runs on disk
 
 While `serve.py` is running, the page saves the whole run to `runs/latest.json` every 20

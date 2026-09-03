@@ -567,7 +567,11 @@ async function loadFreeModels() {
 // Each instruction set has its own ancestor: a JSON-tools cell and a vi cell are not
 // written in the same language.
 async function loadAncestor() {
-  const file = opts.mode === 'vi' ? './ancestor-vi.md' : './ancestor.md';
+  // ?seed=min uses a seed short enough for a slow card: prefill is one dispatch, and on
+  // Windows a dispatch over two seconds gets the device reset. A T1000 prefills about a
+  // hundred tokens a second, so the full seed's 232 tokens is already over the line.
+  const min = new URL(location.href).searchParams.get('seed') === 'min';
+  const file = opts.mode === 'vi' ? (min ? './ancestor-vi-min.md' : './ancestor-vi.md') : './ancestor.md';
   // Normalised, so a seed saved with Windows line endings still parses the same.
   $('ancestor').value = (await (await fetch(file)).text()).replace(/\r\n?/g, '\n').trim();
 }
