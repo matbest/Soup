@@ -21,6 +21,3 @@ Other keys, if you ever want them: `h j k l` move the cursor; `H J K L`
 move one whole cell west, south, north, east; `i a o` insert and `<Esc>`
 stops inserting; `yy` yanks a line and `p P` paste; `V` starts a line
 selection, `d` deletes and `x` deletes one character.
-
-Copying is imperfect, so a copy of this file may differ from it. What you
-are reading is whatever survived.

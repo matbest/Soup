@@ -260,9 +260,10 @@ to mirror the shape of what it was given, so the payload goes first and the pros
 An earlier version led with a table of keys, and a 1B model answered by narrating the
 table one key at a time until it ran out of tokens, never reaching the instruction.
 
-The seed says what a cell is and how to reproduce, and nothing about what tends to
-survive: no mention that compute is scarce, that shorter runs more often, or that anything
-is being selected for. Hinting the answer would decide the experiment.
+The seed says what a cell is, how to reproduce, and what the keys do. Nothing else: no
+mention that compute is scarce, that shorter runs more often, that copying is imperfect,
+or that anything is being selected for. Hinting the answer would decide the experiment.
+(A host-supplied system prompt is a separate lever, and there isn't one yet.)
 
 The keys are written spread out — `gg yG   L   gg VG p` — because spaces and line breaks
 are no-ops in normal mode, and ten dense characters are hard for a small model to copy
