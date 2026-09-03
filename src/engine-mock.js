@@ -21,7 +21,7 @@ export function createMockEngine({ rng = Math.random, chatter = 0.02 } = {}) {
         reply = { calls: [{ tool: 'list_files', directory: '.' }] };
       } else {
         const listing = messages[messages.length - 1].content;
-        const empties = NEIGHBOURS.filter(p => new RegExp(`^${p}\\s+empty$`, 'm').test(listing));
+        const empties = NEIGHBOURS.filter(p => new RegExp(`^${p}\\s+empty`, 'm').test(listing));
         const pool = empties.length ? empties : NEIGHBOURS;
         const dst = pool[Math.floor(rng() * pool.length)];
         reply = rng() < chatter

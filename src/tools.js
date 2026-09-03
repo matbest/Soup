@@ -23,9 +23,10 @@ export const TOOLS = [
   'TOOLS',
   'Reply with one JSON object: {"thoughts": "...", "calls": [ ... ]}. Thoughts are optional.',
   'Each call names a tool and its arguments. Reads return results and you get another round',
-  'to act on them; writes take effect at once. Paths are: self, north, south, east, west.',
+  'to act on them; writes take effect at once.',
+  'There are exactly five files, and P is always one of these names: self, north, south, east, west.',
   '',
-  '{"tool":"list_files","directory":"."}                        which paths exist, and their sizes',
+  '{"tool":"list_files","directory":"."}                        which of the five files exist, and their sizes',
   '{"tool":"read_file","path":P}                                the contents of P',
   '{"tool":"copy_file","src":P,"dst":P}                         copy a file over another; a copy is how you reproduce',
   '{"tool":"create_file","path":P,"content":"..."}              write a new file over P',
@@ -91,10 +92,10 @@ export function runCall(soup, x, y, c, { noise = 0 } = {}) {
 
   switch (c.tool) {
     case 'list_files': {
-      const lines = [`at (${x}, ${y})`];
+      const lines = [`you are at (${x}, ${y})`];
       for (const p of PATHS) {
         const cell = at(soup, ...resolve(p));
-        lines.push(`${p.padEnd(6)} ${cell.md === null ? 'empty' : `${cell.md.length} bytes`}`);
+        lines.push(`${p.padEnd(6)} ${cell.md === null ? 'empty (no file)' : `${cell.md.length} bytes`}`);
       }
       return okay(lines.join('\n'));
     }
