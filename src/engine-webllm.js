@@ -38,11 +38,15 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
     lastUsage: null,
     get raw() { return engine; },
     gpu: null,
-    lost: null,   // reason, once the GPU device has gone
+    lost: null,   // why the GPU device has gone, once it has
     async load() {
       if (!navigator.gpu) throw new Error('WebGPU is not available in this browser');
       self.gpu = await describeAdapter();
-      watchDevice(reason => { self.lost = reason; onProgress?.(`GPU device lost: ${reason}`); console.error('[soup] GPU device lost:', reason); });
+      // The runtime under WebLLM destroys its device on any buffer error (out of memory,
+      // validation, internal) and then disposes everything it holds; WebLLM keeps its
+      // references, so the next call fails on whatever freed object it touches first.
+      // The actual error only goes to console.error, just before. Catch it there.
+      captureGpuErrors(reason => { if (!self.lost) { self.lost = reason; onProgress?.(`GPU error: ${reason}`); } });
       const webllm = await import(WEBLLM_URL);
       try {
         engine = await webllm.CreateMLCEngine(modelId, {
@@ -67,8 +71,14 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       engine = null;
     },
     async complete({ messages, maxTokens, temperature }) {
-      if (self.lost) throw new Error(`the GPU device was lost (${self.lost}); reload the page`);
-      const r = await engine.chat.completions.create({ messages, max_tokens: maxTokens, temperature, top_p: 1 });
+      if (self.lost) throw new Error(`the GPU gave up: ${self.lost}. Reload the page; if it recurs, try a smaller model.`);
+      let r;
+      try {
+        r = await engine.chat.completions.create({ messages, max_tokens: maxTokens, temperature, top_p: 1 });
+      } catch (err) {
+        if (self.lost) throw new Error(`the GPU gave up: ${self.lost}. Reload the page; if it recurs, try a smaller model.`);
+        throw err;
+      }
       self.lastUsage = r.usage ?? null;
       const text = r.choices?.[0]?.message?.content ?? '';
       // Belt and braces: never return more than the slice, whatever the model says.
@@ -78,15 +88,24 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
   return self;
 }
 
-// Hold a small device of our own on the adapter and watch it. A driver reset or a power
-// event loses every device on the adapter at once, so ours going is a reliable sign that
-// WebLLM's has gone too, and the page can say so instead of failing on the next call.
-async function watchDevice(onLost) {
-  try {
-    const a = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-    const d = await a?.requestDevice();
-    d?.lost.then(info => onLost(`${info.reason || 'unknown'}${info.message ? `: ${info.message}` : ''}`));
-  } catch { /* nothing to watch */ }
+// The runtime reports GPU errors and its own device loss only through console.error.
+// Wrap it once and pass on anything that looks like either.
+let capturing = false;
+function captureGpuErrors(onError) {
+  if (capturing) return;
+  capturing = true;
+  const original = console.error.bind(console);
+  console.error = (...args) => {
+    original(...args);
+    for (const a of args) {
+      const name = a?.constructor?.name ?? '';
+      if (/^GPU(OutOfMemory|Validation|Internal)?Error$/.test(name) || /GPUDeviceLostInfo/.test(name)) {
+        onError(`${name.replace(/^GPU|Error$/g, '') || 'device lost'}: ${a.message ?? a.reason ?? ''}`.trim());
+      } else if (typeof a === 'string' && /device lost/i.test(a)) {
+        onError(a.replace(/\s+/g, ' ').slice(0, 160));
+      }
+    }
+  };
 }
 
 // Which GPU WebGPU hands us. WebLLM asks for "high-performance" itself; on a dual-GPU
