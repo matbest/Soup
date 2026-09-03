@@ -37,6 +37,8 @@
   #stats { color: #e6e1d6; }
   textarea { width: 100%; font: inherit; background: #101214; color: #e6e1d6; border: 1px solid #23262a; padding: 5px; resize: vertical; }
   #ancestor { height: 180px; }
+  #orkey { margin-bottom: 4px; }
+  #or-note { align-self: center; color: #8fa39b; }
   #probe-v { color: #8fa39b; }
   details summary { cursor: pointer; color: #8fa39b; }
   @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } .stage { max-height: none; width: 100%; } }
@@ -63,7 +65,7 @@
           <button id="reset">Reset</button>
           <button id="export">Export</button>
         </div>
-        <label>engine <select id="engine"><option value="mock">mock</option></select><span></span></label>
+        <label>engine <select id="engine"><optgroup label="openrouter (free)" id="or-group"></optgroup><option value="mock">mock</option></select><span></span></label>
         <label>grid <select id="size"><option>8</option><option selected>12</option><option>16</option><option>20</option><option>32</option></select><span></span></label>
         <label>ticks/frame <input id="tpf" type="range" min="1" max="200" value="20"><span id="tpf-v"></span></label>
       </fieldset>
@@ -103,6 +105,14 @@
         <legend>ancestor (seed: Reset places this in the centre cell)</legend>
         <textarea id="ancestor" spellcheck="false"></textarea>
         <div class="row"><button id="probe">Probe</button><span id="probe-v"></span></div>
+      </fieldset>
+      <fieldset>
+        <legend>OpenRouter (optional: run the cells on free hosted models)</legend>
+        <input id="orkey" type="password" placeholder="paste your own OpenRouter key" autocomplete="off" spellcheck="false">
+        <div class="row"><button id="orload">Load free models</button><span id="or-note"></span></div>
+        <pre class="box">Kept in this browser only, never sent anywhere but OpenRouter.
+Cell text leaves your machine. The free tier is rate limited, so
+a run paces itself. No GPU needed.</pre>
       </fieldset>
       <fieldset>
         <legend>TOOLS (sent after every cell's text)</legend>

@@ -145,6 +145,12 @@ Hence two switches that look like fussiness and are not:
   neighbour; occasionally chatters instead.
   Exists to develop the loop without waiting on inference, and as the control for whether
   behaviour comes from the model or from the rules.
+- `openrouter`: the cells run on OpenRouter's free hosted models instead of the local GPU.
+  No WebGPU and no watchdog, models far bigger than a laptop can hold, and a genuinely
+  stateless environment per turn. The costs are different rather than absent: the free
+  tier is rate limited so the soup runs at the API's pace, and a cell's text leaves the
+  machine. The key is the visitor's own, kept in their browser's localStorage; there is
+  none in this repo and a published copy must ask each visitor for theirs.
 - `webllm`: a small instruct model over WebGPU, loaded in the page and cached by the
   browser. Qwen2.5-0.5B is the working floor; the status line shows which GPU it got.
 

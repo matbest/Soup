@@ -3,6 +3,7 @@ import { createScheduler, prompt } from './scheduler.js';
 import { setTools } from './tools.js';
 import { createMockEngine } from './engine-mock.js';
 import { createWebLLMEngine, MODELS, DEFAULT_MODEL, describeAdapter } from './engine-webllm.js';
+import { createOpenRouterEngine, freeModels, storedKey, storeKey, PREFIX } from './engine-openrouter.js';
 import { createView } from './view.js';
 import { estimateTokens } from './tokens.js';
 
@@ -20,9 +21,10 @@ const view = createView($('grid'), () => soup, {
 const ancestor = () => $('ancestor').value.trim();
 
 async function makeEngine(name) {
-  const e = name === 'mock'
-    ? createMockEngine()
-    : createWebLLMEngine(name, { onProgress: t => { $('status').textContent = t; } });
+  const onProgress = t => { $('status').textContent = t; };
+  const e = name === 'mock' ? createMockEngine()
+    : name.startsWith(PREFIX) ? createOpenRouterEngine(name.slice(PREFIX.length), { onProgress })
+    : createWebLLMEngine(name, { onProgress });
   setBusy(true);
   $('status').textContent = `loading ${e.name}`;
   try {
@@ -250,6 +252,10 @@ async function init() {
   $('manual').textContent = setTools(new URL(location.href).searchParams.get('tools'));
   for (const b of document.querySelectorAll('nav [role=tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
   $('gpu').textContent = navigator.gpu ? `gpu: ${await describeAdapter()}` : 'gpu: WebGPU not available in this browser';
+  $('orkey').value = storedKey();
+  $('orkey').addEventListener('change', () => { storeKey($('orkey').value); loadFreeModels(); });
+  $('orload').addEventListener('click', loadFreeModels);
+  if (storedKey()) loadFreeModels();
   bind('temperature', 'temperature');
   bind('slice', 'maxTokens');
   bind('noise', 'noise');
@@ -306,6 +312,26 @@ async function init() {
   });
   window.addEventListener('resize', () => view.draw());
   requestAnimationFrame(animate);
+}
+
+// OpenRouter's free list changes week to week, so ask for it rather than hardcode it.
+// Nothing is added to the picker until the visitor has supplied their own key.
+async function loadFreeModels() {
+  const group = $('or-group');
+  group.innerHTML = '';
+  $('or-note').textContent = 'fetching the free list';
+  try {
+    const models = await freeModels();
+    for (const m of models) {
+      const o = document.createElement('option');
+      o.value = PREFIX + m.id;
+      o.textContent = `${m.id}${m.schema ? '  (schema)' : ''}`;
+      group.appendChild(o);
+    }
+    $('or-note').textContent = `${models.length} free models, ${models.filter(m => m.schema).length} that can be held to the schema`;
+  } catch (err) {
+    $('or-note').textContent = err.message;
+  }
 }
 
 // Redraw only while a cell is at the model, so the working mark turns.
