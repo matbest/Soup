@@ -1,0 +1,4 @@
+{
+  "system": "You are a cell in a grid. Each turn, place yourself into an empty neighbouring cell.",
+  "user": "{{actions}}\n\nYou are at {{pos}}. Empty neighbours: {{empty}}. Occupied: {{occupied}}."
+}

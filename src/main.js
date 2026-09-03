@@ -73,7 +73,7 @@ function describe(ev) {
   if (!ev.effects.length) return `t${ev.tick}: no action`;
   return `t${ev.tick}: ` + ev.effects.map(e =>
     `${e.verb} ${e.target}${e.target === 'self' ? '' : ` (${e.x}, ${e.y})`}` +
-    (e.ok === false ? ' [no match]' : '') + (e.mutated ? ' [mutated]' : '') + (e.overwrote && e.verb === 'place' ? ' [overwrote]' : '')
+    (e.ok === false ? ' [no effect]' : '') + (e.mutated ? ' [mutated]' : '') + (e.overwrote && e.verb === 'place' ? ' [overwrote]' : '')
   ).join(', ');
 }
 
@@ -101,8 +101,8 @@ function showTab(name) {
   for (const p of document.querySelectorAll('.panel')) p.hidden = p.dataset.panel !== name;
 }
 
-// Echo fidelity. Put the current ancestor alone in a scratch grid, give it one turn with
-// the real engine, and report what it did and how faithfully it reproduced its text.
+// One turn of the current ancestor, alone in a scratch grid, with the real engine:
+// what it did, what it cost, how long it took.
 async function probe() {
   if (busy || running) return;
   setBusy(true);
@@ -122,11 +122,9 @@ async function probe() {
       return;
     }
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
-    const exact = ev.text === md;
-    const sim = similarity(md, ev.text);
-    const fidelity = exact ? 'exact' : `${(sim * 100).toFixed(0)}% of lines kept`;
-    $('probe-v').textContent = `${fidelity}, ${ev.effects.length} call${ev.effects.length === 1 ? '' : 's'}, ${secs}s`;
-    $('cell-head').textContent = `probe: echo ${fidelity}${usageText(ev.usage)}  ${secs}s`;
+    const n = ev.effects.length;
+    $('probe-v').textContent = `${n} action${n === 1 ? '' : 's'}, ${secs}s`;
+    $('cell-head').textContent = `probe: ${n} action${n === 1 ? '' : 's'}${usageText(ev.usage)}  ${secs}s`;
     $('prompt').textContent = renderMessages(prompt(scratch, 1, 1, md, opts).messages);
     $('genome').textContent = md;
     $('output').textContent = describe(ev) + '\n\n' + ev.out;
@@ -134,14 +132,6 @@ async function probe() {
   } finally {
     setBusy(false);
   }
-}
-
-// Fraction of the original's lines that appear verbatim in the copy.
-function similarity(original, copy) {
-  const lines = original.split('\n').map(l => l.trim()).filter(Boolean);
-  if (!lines.length) return 0;
-  const have = new Set(copy.split('\n').map(l => l.trim()));
-  return lines.filter(l => have.has(l)).length / lines.length;
 }
 
 // Yields on a timer, not requestAnimationFrame, so a soup left running in a background
@@ -209,7 +199,7 @@ async function init() {
     o.textContent = `${m.id.replace(/-(Instruct-)?q\w+-MLC$/, '')}  ~${(m.vram / 1024).toFixed(1)} GB`;
     $('engine').appendChild(o);
   }
-  $('ancestor').value = (await (await fetch('./ancestor.md')).text()).trim();
+  $('ancestor').value = (await (await fetch('./ancestor.json')).text()).trim();
   $('manual').textContent = MANUAL;
   for (const b of document.querySelectorAll('nav [role=tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
   $('gpu').textContent = navigator.gpu ? `gpu: ${await describeAdapter()}` : 'gpu: WebGPU not available in this browser';

@@ -1,6 +1,8 @@
 import { at, coords, occupiedIndices, neighbourCoords, DIR_NAMES } from './soup.js';
 import { buildMessages, makeSlots } from './document.js';
-import { execute, STRUCTURAL_TAG, MANUAL } from './actions.js';
+import { execute, REPLY_SCHEMA, MANUAL } from './actions.js';
+
+const SCHEMA = JSON.stringify(REPLY_SCHEMA);
 
 // Tierra's slicer, minus the reaper. Sweeps every occupied cell once in a random order,
 // one cell per tick, then reshuffles. `opts` is read live so the UI can change it mid-run.
@@ -30,7 +32,7 @@ export function createScheduler(soup, engine, opts) {
         messages,
         doc: cell.md,
         slots,
-        structuralTag: STRUCTURAL_TAG,
+        schema: SCHEMA,
         maxTokens: opts.maxTokens,
         temperature: opts.temperature,
       });
@@ -39,9 +41,9 @@ export function createScheduler(soup, engine, opts) {
     }
     soup.tick++;
     cell.turns++;
-    const { text, effects } = execute(soup, x, y, out, { noise: opts.noise });
+    const { thoughts, effects } = execute(soup, x, y, out, { noise: opts.noise });
     if (effects.length === 0) cell.fails++;
-    const ev = { tick: soup.tick, x, y, out, text, effects, usage: engine.lastUsage ?? null };
+    const ev = { tick: soup.tick, x, y, out, thoughts, effects, usage: engine.lastUsage ?? null };
     soup.cells[i].last = ev;   // whoever now occupies the cell, possibly a replacement
     log.push(ev);
     if (log.length > 500) log.shift();

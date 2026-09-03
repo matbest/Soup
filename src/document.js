@@ -1,47 +1,53 @@
 // A cell is a document, and the document is the whole program. This module turns one
 // into the messages a model receives, and nothing more: the host injects no prompt.
 //
-// Lines reading `system:` or `user:` open sections sent as those messages; text before
-// the first label, or a document with no labels, is the user message. A document with no
-// system section gets an empty system message, which overrides the model's own default
-// ("You are a helpful assistant.") with nothing.
-//
-// Observations reach a document only through slots it chooses to carry, expanded once,
-// without recursion, so the raw text inside {{self}} keeps its slots for echoing.
+// A document is a JSON object. `system` and `user` are the only keys the host knows;
+// they are sent as those messages with slots expanded, once. Any other key is the
+// cell's own state, readable through a slot of the same name. A document that is not
+// valid JSON is not dead: its whole text is sent as the user message, slots still
+// expand, and `place` still copies it byte for byte. It has only lost its structure.
 
 import { DIR_NAMES } from './soup.js';
 
-const LABEL = /^\s*(system|user):\s*(.*)$/;
-
-export function sections(doc) {
-  const out = { system: [], user: [] };
-  let current = 'user';
-  for (const line of doc.split('\n')) {
-    const m = LABEL.exec(line);
-    if (m) {
-      current = m[1];
-      if (m[2]) out[current].push(m[2]);
-      continue;
-    }
-    out[current].push(line);
+export function parseDoc(md) {
+  try {
+    const o = JSON.parse(md);
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : null;
+  } catch {
+    return null;
   }
-  return { system: out.system.join('\n').trim(), user: out.user.join('\n').trim() };
+}
+
+export function serialize(obj) {
+  return JSON.stringify(obj, null, 2);
 }
 
 export function expand(text, slots) {
   return text.replace(/\{\{(\w+)\}\}/g, (whole, name) => (name in slots ? slots[name] : whole));
 }
 
-export function buildMessages(doc, slots) {
-  const s = sections(doc);
+const asText = v => (typeof v === 'string' ? v : JSON.stringify(v));
+
+// The document's own fields become slots too, and take precedence over the host's: a
+// document that carries its own `actions` field has replaced the manual with its own.
+export function buildMessages(md, hostSlots) {
+  const doc = parseDoc(md);
+  if (!doc) {
+    return [
+      { role: 'system', content: '' },
+      { role: 'user', content: expand(md, hostSlots) },
+    ];
+  }
+  const slots = { ...hostSlots };
+  for (const [k, v] of Object.entries(doc)) if (v !== null && v !== undefined) slots[k] = asText(v);
   return [
-    { role: 'system', content: expand(s.system, slots) },
-    { role: 'user', content: expand(s.user, slots) },
+    { role: 'system', content: expand(asText(doc.system ?? ''), slots) },
+    { role: 'user', content: expand(asText(doc.user ?? ''), slots) },
   ];
 }
 
-// The slots the host offers. `manual` is the verbs' description, `neighbours` maps a
-// direction to a document or null.
+// The slots the host offers. `manual` is the verbs' description; `neighbours` maps a
+// direction to a document string or null.
 export function makeSlots({ doc, x, y, neighbours, tokens, manual }) {
   const empty = DIR_NAMES.filter(d => neighbours[d] === null);
   const occupied = DIR_NAMES.filter(d => neighbours[d] !== null);

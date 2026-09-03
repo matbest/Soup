@@ -89,7 +89,7 @@
         <pre id="output" class="box"></pre>
       </fieldset>
       <details>
-        <summary>raw document (slots unexpanded)</summary>
+        <summary>raw document</summary>
         <pre id="genome" class="box"></pre>
       </details>
     </section>
@@ -106,13 +106,14 @@
       </fieldset>
       <fieldset>
         <legend>slots</legend>
-        <pre class="box">{{self}}       this document, raw
-{{pos}}        coordinates
+        <pre class="box">{{pos}}        coordinates
 {{empty}}      empty neighbours, e.g. S, W
 {{occupied}}   occupied neighbours
 {{N}} {{E}} {{S}} {{W}}   a neighbour's document
 {{tokens}}     the slice for this turn
-{{actions}}    the manual above</pre>
+{{actions}}    the manual above
+{{self}}       this document, raw
+{{key}}        any field of this document, by name</pre>
       </fieldset>
     </section>
   </aside>
