@@ -1,7 +1,7 @@
 import { coords, occupiedIndices } from './soup.js';
 import { estimateTokens } from './tokens.js';
 import * as tools from './tools.js';
-import { viPrompt, viTurn, VI_HELP } from './vi-soup.js';
+import { viPrompt, viTurn } from './vi-soup.js';
 const { READS, parseReply, runCall, renderResults } = tools;
 
 const schemaFor = (writeOnly, n) => JSON.stringify(writeOnly ? tools.writeSchema(n) : tools.replySchema(n));
@@ -107,7 +107,7 @@ export function createScheduler(soup, engine, opts) {
   return { step, log, get active() { return active; } };
 }
 
-export { VI_HELP, viPrompt };
+export { viPrompt };
 
 // What a cell's turn starts from: its own text, then the TOOLS. Nothing else.
 export function prompt(md) {

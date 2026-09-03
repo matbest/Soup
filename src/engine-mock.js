@@ -18,18 +18,17 @@ export function createMockEngine({ rng = Math.random, chatter = 0.02 } = {}) {
     async reset() {},
     async complete({ messages, maxTokens }) {
       const promptText = messages[messages.length - 1].content;
-      // In vi mode it does what a real model asked for keystrokes would do at its best:
-      // find the keystrokes written in the cell's own text and echo them, with a chance
-      // of getting one character wrong.
-      if (/^VI\. Reply with vi keystrokes/m.test(promptText)) {
-        const genome = promptText.split(/^VI\./m)[0];
-        const found = genome.match(/^[a-zA-Z0-9<>$^{}\[\]]{4,40}$/m);
-        let keys = found ? found[0] : '';
+      // A vi cell's whole prompt is its own text, so there is no marker to look for: if it
+      // carries a fenced block, this stands in for a model that finds it and echoes it,
+      // with a chance of getting one character wrong.
+      const fenced = /```[a-z]*\n([\s\S]*?)```/i.exec(promptText);
+      if (fenced) {
+        let keys = fenced[1].trim().split('\n')[0];
         if (keys && rng() < chatter * 5) {
           const i = Math.floor(rng() * keys.length);
           keys = keys.slice(0, i) + 'qzx'[Math.floor(rng() * 3)] + keys.slice(i + 1);
         }
-        return keys;
+        return '```\n' + keys + '\n```';
       }
       let reply;
       if (messages.length <= 2) {

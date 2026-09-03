@@ -227,16 +227,20 @@ language.
 ### Wired into the soup
 
 Choose **instructions: vi keystrokes** on the run tab (the default on this branch; add
-`?mode=tools` for the JSON toolset). A turn is then one call: the cell's text goes to the
-model with a short key reference, and the reply is run as keystrokes over the grid,
-starting in that cell. There is no looking around first and no protocol — the reply is the
-program. Writing is lossy at the copy-noise rate, so variation enters wherever text is
-written.
+`?mode=tools` for the JSON toolset). A turn is one call, and **the cell's text is the
+entire body sent to the model** — no reference block, no host paragraph, no system turn.
+The reply comes back as an ordinary one, prose and commands, and the commands are taken
+from whatever the model marked as code: fenced blocks first, then backticked spans, and
+failing any marking a last line that looks like keys rather than words. A reply with
+nothing usable in it runs nothing, because prose executed as vi is destruction, and the
+turn has still spent its slice.
 
-The ancestor (`ancestor-vi.md`) is a text whose job is to make the model emit
-`ggyGLggVGp`. That is the whole experiment: a cell's text is not data the model reads
-about, it is the thing that has to induce a working program. A wording that reliably
-produces those keys spreads; one that produces something close but wrong does not.
+Because the cell is everything, the key reference lives in the cell too. The ancestor
+(`ancestor-vi.md`) carries its own table of keys and its own fenced `ggyGLggVGp`, which
+makes that knowledge heritable and mutable like the rest: a lineage that keeps a good
+reference reproduces, one that loses it drifts. That is the whole experiment. A cell's
+text is not data the model reads about, it is the thing that has to induce a working
+program.
 
 Two dynamics show up within a few hundred ticks. A genome that only goes east fills one
 row of the torus and stops, so the soup selects for variation in direction. And the texts

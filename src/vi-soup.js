@@ -13,32 +13,43 @@ import { at, wrap } from './soup.js';
 import { run, tokenize } from './vi.js';
 import { mutate } from './mutate.js';
 
-// Shown after every cell's text. The only thing the host adds.
-export const VI_HELP = [
-  'VI. Reply with vi keystrokes on one line and nothing else.',
-  'h j k l  0 ^ $  w b e  gg G  3j        move the cursor in this cell',
-  'H J K L  2L                            move one cell west south north east, and on',
-  'i a I A o O  <Esc>                     insert text',
-  'x D r{char}  dd dw dG  cc cw C         delete and change',
-  'yy Y yG  p P                           yank and paste',
-  'V then a motion then d y c p           visual line; p replaces the selection',
-].join('\n');
-
+// Nothing. The cell's text is the entire body sent to the model — no reference block, no
+// host paragraph, no system turn. If a cell wants the model to know what the keys are, it
+// has to carry that knowledge itself, which makes the knowledge heritable and mutable
+// like everything else: a lineage that keeps a good reference reproduces, one that loses
+// it drifts.
 export function viPrompt(md) {
   return [
     { role: 'system', content: '' },
-    { role: 'user', content: `${md}\n\n${VI_HELP}` },
+    { role: 'user', content: md },
   ];
 }
 
-// What the model said, as keystrokes. A fenced block or prose around them is stripped and
-// the first non-empty line is taken: a reply is a program, and a program is one line.
+// The keystrokes in what the model said. A reply is an ordinary one — some prose, then
+// the commands — so the commands are taken from whatever the model marked as code: fenced
+// blocks first, then backticked spans, in the order it wrote them.
+//
+// Failing any marking, the last line is taken if it looks like keys rather than words: no
+// spaces, and something in it that is not a lowercase letter. That last test is a guess,
+// and it is meant to be a cheap one — `ggyGLggVGp` passes, `reproduce` does not. A reply
+// with nothing usable in it runs nothing, because prose executed as vi is destruction,
+// and a turn that said nothing usable has still spent its slice.
+const FENCE = /```[a-z]*\n([\s\S]*?)```/gi;
+const TICKS = /`([^`\n]+)`/g;
+
 export function keystrokesFrom(reply) {
-  const body = String(reply ?? '')
-    .replace(/```[a-z]*\n?/gi, '')
-    .replace(/```/g, '');
-  const line = body.split('\n').map(l => l.trim()).find(Boolean) ?? '';
-  return line.replace(/^[`'"]|[`'"]$/g, '');
+  const text = String(reply ?? '');
+
+  const fenced = [...text.matchAll(FENCE)].map(m => m[1].trim()).filter(Boolean);
+  if (fenced.length) return fenced.join('').replace(/\n+/g, '');
+
+  const ticked = [...text.matchAll(TICKS)].map(m => m[1].trim()).filter(Boolean);
+  if (ticked.length) return ticked.join('');
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const last = lines[lines.length - 1] ?? '';
+  const looksLikeKeys = last.length >= 2 && last.length <= 200 && !/\s/.test(last) && !/^[a-z]+$/.test(last);
+  return looksLikeKeys ? last : '';
 }
 
 // Run one cell's turn. Returns what changed, for the log and the view.
