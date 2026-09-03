@@ -90,7 +90,8 @@ function transcript(ev) {
       const args = c.tool === 'list_files' ? '.' : c.tool === 'copy_file' ? `${c.src} -> ${c.dst}` : c.path;
       return `  ${c.tool}(${args}) -> ${res.ok ? 'ok' : 'error'}: ${res.output.split('\n')[0]}${res.output.includes('\n') ? ' …' : ''}`;
     }).join('\n');
-    return `— round ${k + 1} —\n${r.out}\n${results ? '\n' + results : ''}`;
+    const why = [r.finish && r.finish !== 'stop' ? `finish: ${r.finish}` : '', r.calls.length ? '' : 'no calls found in this reply'].filter(Boolean).join('   ');
+    return `— round ${k + 1} —${why ? `  [${why}]` : ''}\n${r.out || '(empty reply)'}\n${results ? '\n' + results : ''}`;
   }).join('\n\n');
 }
 
@@ -303,7 +304,14 @@ async function init() {
     reset();
   });
   $('export').addEventListener('click', () => {
-    const blob = new Blob([snapshot(soup)], { type: 'application/json' });
+    // The transcripts, not just the grid: what a turn did and did not do is the evidence.
+    const dump = JSON.stringify({
+      engine: engine.name,
+      opts,
+      soup: JSON.parse(snapshot(soup)),
+      turns: sched.log.slice(-40),
+    }, null, 2);
+    const blob = new Blob([dump], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `soup-t${soup.tick}.json`;
