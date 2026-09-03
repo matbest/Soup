@@ -8,12 +8,19 @@ import { charBudget } from './tokens.js';
 // simply stops when it is spent, and a copy cut off before END is not a copy.
 const WEBLLM_URL = 'https://esm.run/@mlc-ai/web-llm@0.2.84';
 
+// Roughly in order of size. VRAM is WebLLM's own estimate.
 export const MODELS = [
-  'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
-  'SmolLM2-135M-Instruct-q0f16-MLC',
-  'SmolLM2-360M-Instruct-q4f16_1-MLC',
-  'Llama-3.2-1B-Instruct-q4f16_1-MLC',
-  'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
+  'SmolLM2-135M-Instruct-q0f16-MLC',          //  ~0.4 GB
+  'SmolLM2-360M-Instruct-q4f16_1-MLC',        //  ~0.4 GB
+  'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',        //  ~0.9 GB
+  'Llama-3.2-1B-Instruct-q4f16_1-MLC',        //  ~0.9 GB
+  'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',        //  ~1.6 GB
+  'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC',  //  ~1.6 GB
+  'Qwen3-1.7B-q4f16_1-MLC',                   //  ~2.0 GB
+  'Llama-3.2-3B-Instruct-q4f16_1-MLC',        //  ~2.3 GB
+  'Qwen2.5-3B-Instruct-q4f16_1-MLC',          //  ~2.5 GB
+  'Qwen2.5-Coder-3B-Instruct-q4f16_1-MLC',    //  ~2.5 GB
+  'Qwen3-4B-q4f16_1-MLC',                     //  ~3.4 GB
 ];
 
 export function createWebLLMEngine(modelId, { onProgress } = {}) {
