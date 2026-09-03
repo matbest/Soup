@@ -35,9 +35,18 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       if (!navigator.gpu) throw new Error('WebGPU is not available in this browser');
       self.gpu = await describeAdapter();
       const webllm = await import(WEBLLM_URL);
-      engine = await webllm.CreateMLCEngine(modelId, {
-        initProgressCallback: p => onProgress?.(p.text),
-      });
+      try {
+        engine = await webllm.CreateMLCEngine(modelId, {
+          initProgressCallback: p => onProgress?.(p.text),
+        });
+      } catch (err) {
+        // The browser's GPU process can drop its WebGPU device; a full restart of the
+        // browser brings it back. Say so, instead of WebLLM's paragraph about compatibility.
+        if (/compatible GPU/i.test(err?.message ?? '')) {
+          throw new Error(`no WebGPU device right now (adapter: ${self.gpu}). This usually means the browser's GPU process has dropped it; quit the browser completely and reopen it, then reload.`);
+        }
+        throw err;
+      }
     },
     async complete({ messages, structuralTag, maxTokens, temperature }) {
       const r = await engine.chat.completions.create({
