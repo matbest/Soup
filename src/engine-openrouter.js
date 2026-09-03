@@ -39,6 +39,18 @@ export async function freeModels() {
     .sort((a, b) => (b.schema - a.schema) || a.id.localeCompare(b.id));
 }
 
+// OpenRouter puts the useful part in a JSON error body; pass it on rather than replacing
+// it with a guess.
+function detail(body) {
+  try {
+    const e = JSON.parse(body).error;
+    const meta = e?.metadata ? ` ${JSON.stringify(e.metadata).slice(0, 120)}` : '';
+    return `${e?.message ?? body}${meta}`.slice(0, 240);
+  } catch {
+    return String(body).slice(0, 240) || '(no detail)';
+  }
+}
+
 export function createOpenRouterEngine(modelId, { onProgress, minIntervalMs = 3500 } = {}) {
   let supportsSchema = false;
   let nextAllowedAt = 0;
@@ -51,13 +63,22 @@ export function createOpenRouterEngine(modelId, { onProgress, minIntervalMs = 35
     lost: null,
 
     async load() {
-      if (!storedKey()) throw new Error('no OpenRouter key: paste one in the setup tab');
+      const key = storedKey();
+      if (!key) throw new Error('no OpenRouter key: paste one in the setup tab');
+      // Check the key before the run rather than in the middle of one, and say what
+      // OpenRouter says about it: guessing at an auth failure wastes everyone's time.
+      onProgress?.('checking the key');
+      const who = await fetch(`${BASE}/key`, { headers: { Authorization: `Bearer ${key}` } });
+      const body = await who.text();
+      if (!who.ok) throw new Error(`OpenRouter rejected the key (${who.status}): ${detail(body)}`);
+      const info = JSON.parse(body).data ?? {};
       onProgress?.(`checking ${modelId}`);
       const models = await freeModels();
       const found = models.find(m => m.id === modelId);
       if (!found) throw new Error(`${modelId} is not in OpenRouter's free list right now`);
       supportsSchema = found.schema;
-      self.gpu = `openrouter, ${found.ctx.toLocaleString()} ctx${found.schema ? ', schema' : ''}`;
+      const limit = info.limit_remaining != null ? `, ${info.limit_remaining} left` : info.is_free_tier ? ', free tier' : '';
+      self.gpu = `openrouter, ${found.ctx.toLocaleString()} ctx${found.schema ? ', schema' : ''}${limit}`;
     },
 
     async unload() {},
@@ -101,8 +122,7 @@ export function createOpenRouterEngine(modelId, { onProgress, minIntervalMs = 35
           nextAllowedAt = Date.now() + wait;
           continue;
         }
-        if (r.status === 401 || r.status === 403) throw new Error('OpenRouter rejected the key');
-        if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${(await r.text()).slice(0, 160)}`);
+        if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${detail(await r.text())}`);
 
         const json = await r.json();
         if (json.error) throw new Error(`OpenRouter: ${String(json.error.message ?? json.error).slice(0, 160)}`);
