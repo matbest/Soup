@@ -358,14 +358,14 @@ let recoveries = 0;
 let lastSaveTick = 0;
 
 async function recoverEngine() {
-  if (!engine.recover || recoveries >= 5) return false;
+  if (!engine.recover || recoveries >= 20) return false;   // a long run should survive a bad night
   recoveries++;
   $('status').textContent = `GPU was reset; rebuilding the model (${recoveries})`;
   console.warn('[soup] GPU was reset; rebuilding the model', recoveries);
   setBusy(true);
   try {
     await engine.recover();
-    $('status').textContent = `${engine.name} on ${engine.gpu}  (recovered ${recoveries}x)`;
+    $('status').textContent = `${engine.name} on ${engine.gpu}  (recovered ${recoveries}x, window ${Math.floor(promptWindow(engine, opts))} tokens)`;
     return true;
   } catch (err) {
     failed(err);

@@ -33,14 +33,27 @@ export const vramOf = id => MODELS.find(m => m.id === id)?.vram;
 // it. See the README.
 export const DEFAULT_MODEL = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
 
+// What this machine turned out to be capable of, kept between page loads so a reload
+// starts where the last run left off instead of learning it again by losing the device.
+const MEMORY = 'soup.machine.';
+
+function remembered(modelId) {
+  try { return JSON.parse(localStorage.getItem(MEMORY + modelId)) ?? {}; } catch { return {}; }
+}
+
+function remember(modelId, what) {
+  try { localStorage.setItem(MEMORY + modelId, JSON.stringify(what)); } catch { /* private mode */ }
+}
+
 export function createWebLLMEngine(modelId, { onProgress } = {}) {
+  const known = remembered(modelId);
   let engine = null;
   const self = {
     name: modelId,
     instant: false,
     lastUsage: null,
-    prefillRate: null,     // tokens a second, measured, once a turn has run
-    tighten: 1,            // doubles each time this machine loses its device
+    prefillRate: known.rate ?? null,   // tokens a second, measured on this machine
+    tighten: known.tighten ?? 1,       // doubles each time this machine loses its device
     get raw() { return engine; },
     gpu: null,
     lost: null,   // why the GPU device has gone, once it has
@@ -107,7 +120,11 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
     },
     async complete({ messages, schema, maxTokens, temperature }) {
       const gaveUp = () => {
-        const e = new Error(`${self.lost} If it recurs: update the GPU driver, try a smaller model, or raise the watchdog limit (TdrDelay).`);
+        // Whatever shape the loss arrived in, it means the same thing: the last dispatch
+        // was too long for this machine. Halve what a turn may carry, and keep that.
+        self.tighten = Math.min(self.tighten * 2, 16);
+        remember(modelId, { rate: self.prefillRate, tighten: self.tighten });
+        const e = new Error(`${self.lost} Rebuilding with a window half the size.`);
         e.deviceLost = true;
         return e;
       };
@@ -125,7 +142,6 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
         // tokenizer, a tensor. The console line naming the real cause may not have
         // arrived yet, so treat these as the same event and let the page rebuild.
         if (/deleted|disposed/i.test(err?.message ?? String(err))) {
-          self.tighten = Math.min(self.tighten * 2, 8);
           self.lost = 'the GPU device was lost (the runtime found its objects freed).';
           throw gaveUp();
         }
@@ -136,7 +152,10 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       // seconds, and prefill is one piece of work, so this is what decides how much
       // prompt a visitor's card can be given.
       const rate = r.usage?.extra?.prefill_tokens_per_s;
-      if (rate > 0) self.prefillRate = self.prefillRate ? self.prefillRate * 0.7 + rate * 0.3 : rate;
+      if (rate > 0) {
+        self.prefillRate = self.prefillRate ? self.prefillRate * 0.7 + rate * 0.3 : rate;
+        remember(modelId, { rate: self.prefillRate, tighten: self.tighten });
+      }
       const text = r.choices?.[0]?.message?.content ?? '';
       // Belt and braces: never return more than the slice, whatever the model says.
       return text.slice(0, charBudget(maxTokens) * 2);

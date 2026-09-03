@@ -211,6 +211,15 @@ Hence two switches that look like fussiness and are not:
 - `webllm`: a small instruct model over WebGPU, loaded in the page and cached by the
   browser. Qwen2.5-0.5B is the working floor; the status line shows which GPU it got.
 
+### Losing the device is survivable
+
+A device loss no longer ends a run. The page builds a fresh engine on the same adapter and
+carries on, up to twenty times, and each loss halves what a turn may carry — so a machine
+that keeps failing converges on a window it can manage instead of failing the same way
+over and over. What it learns is kept in the browser, per model, so reloading the page
+starts from the measured rate and the tightened window rather than relearning them by
+losing the device again.
+
 ### The window fits the machine
 
 A visitor cannot be asked to change a registry key before a web page will work, so the
