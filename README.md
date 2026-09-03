@@ -69,6 +69,12 @@ Every round re-sends the growing conversation: reading is paid for in prompt tok
 rounds. A missed anchor is an error in the results, so the model can read and retry
 within the turn.
 
+**Length is capped by the turn budget.** A vi cell's own text is the whole of its prompt,
+and prefill is one GPU dispatch whose duration grows with it. The *turn budget* covers
+prompt and reply together, so a genome too long to afford itself cannot act and therefore
+cannot reproduce. On a small card that is also what stops prefill growing until the
+Windows watchdog kills the device.
+
 **Compute is finite.** Each sweep every living cell is given the same allowance of tokens
 (the *tokens/cell* dial; 0 means unlimited). A turn debits what it actually cost, the
 whole prompt and the whole reply. While a cell still has credit it goes again, so a cheap

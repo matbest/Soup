@@ -480,9 +480,10 @@ async function init() {
   $('engine').addEventListener('change', async () => {
     await stop();
     try { localStorage.setItem('soup.engine', $('engine').value); } catch { /* private mode */ }
-    const old = engine;
+    // Release the old model before loading the new one: two resident at once is more than
+    // a small card has, and the allocation that fails takes the device down with it.
+    await engine?.unload?.();
     engine = await makeEngine($('engine').value);
-    if (old !== engine) await old.unload?.();   // never leave two models on the GPU
     reset();
   });
   $('load').addEventListener('click', () => $('loadfile').click());

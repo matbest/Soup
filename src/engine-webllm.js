@@ -79,6 +79,10 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
     // through the old objects. Build a whole new engine on the same (still present)
     // adapter instead, so one reset costs a model load rather than the run.
     async recover() {
+      // Give the old one back first. After a device loss there is nothing to give back and
+      // this throws, which is fine; when the rebuild is for any other reason it is the
+      // difference between one model resident and two.
+      try { await engine?.unload(); } catch { /* its device is already gone */ }
       engine = null;
       self.lost = null;
       const webllm = await import(WEBLLM_URL);

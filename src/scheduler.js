@@ -113,6 +113,22 @@ export function createScheduler(soup, engine, opts) {
   // A vi turn: one call, and whatever comes back is run as keystrokes over the grid.
   async function viStep(i, cell, x, y) {
     const messages = viPrompt(cell.md);
+    // The turn budget covers everything a turn costs, and in vi mode the cell's own text
+    // is all of the prompt. A genome too long to afford itself cannot act, so it cannot
+    // reproduce: length is priced, and past a point it is lethal. It also keeps prefill —
+    // one GPU dispatch, whose duration grows with it — from growing without limit.
+    const promptTokens = messages.reduce((n, m) => n + estimateTokens(m.content), 0);
+    if (opts.budget > 0 && promptTokens + opts.maxTokens > opts.budget) {
+      soup.tick++;
+      cell.turns++;
+      cell.fails++;
+      const ev = { tick: soup.tick, x, y, mode: 'vi', keys: '', keyCount: 0, effects: [], viLog: [],
+        overBudget: true, usage: null, rounds: [{ out: '', calls: [], results: [] }] };
+      cell.last = ev;
+      log.push(ev);
+      if (log.length > 500) log.shift();
+      return ev;
+    }
     active = i;
     let out;
     try {
