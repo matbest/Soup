@@ -1,5 +1,6 @@
 import { createSoup, place, stats, snapshot, coords } from './soup.js';
-import { createScheduler } from './scheduler.js';
+import { createScheduler, prompt } from './scheduler.js';
+import { MANUAL } from './actions.js';
 import { createMockEngine } from './engine-mock.js';
 import { createWebLLMEngine, MODELS, describeAdapter } from './engine-webllm.js';
 import { createView } from './view.js';
@@ -12,7 +13,7 @@ let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
 const view = createView($('grid'), () => soup, {
-  onSelect: showCell,
+  onSelect: i => { showCell(i); showTab('cell'); },
   getActive: () => (sched ? sched.active : null),
 });
 
@@ -76,16 +77,28 @@ function describe(ev) {
   ).join(', ');
 }
 
+// The cell tab shows exactly what the model receives for this cell, as it stands now:
+// the expanded messages, nothing else. Then its last reply, and the raw document folded away.
 function showCell(i) {
-  if (i === null) { $('cell-head').textContent = 'click a cell'; $('genome').value = ''; $('output').textContent = ''; return; }
+  const clear = head => { $('cell-head').textContent = head; $('prompt').textContent = ''; $('genome').textContent = ''; $('output').textContent = ''; };
+  if (i === null) { clear('click a cell on the grid'); return; }
   const c = soup.cells[i];
   const [x, y] = coords(soup, i);
-  if (c.md === null) { $('cell-head').textContent = `(${x}, ${y}) empty`; $('genome').value = ''; $('output').textContent = ''; return; }
+  if (c.md === null) { clear(`(${x}, ${y}) empty`); return; }
   $('cell-head').textContent = `(${x}, ${y})  gen ${c.gen}  born t${c.born}  turns ${c.turns}  fails ${c.fails}  ${c.md.length} chars, about ${estimateTokens(c.md)} tokens`;
-  $('genome').value = c.md;
+  $('prompt').textContent = renderMessages(prompt(soup, x, y, c.md, opts).messages);
+  $('genome').textContent = c.md;
   const ev = c.last;
-  if (!ev) { $('output').textContent = 'has not taken a turn yet'; return; }
-  $('output').textContent = describe(ev) + usageText(ev.usage) + '\n\n' + ev.out;
+  $('output').textContent = ev ? describe(ev) + usageText(ev.usage) + '\n\n' + ev.out : 'has not taken a turn yet';
+}
+
+function renderMessages(messages) {
+  return messages.map(m => `[${m.role}]\n${m.content || '(empty)'}`).join('\n\n');
+}
+
+function showTab(name) {
+  for (const b of document.querySelectorAll('nav [role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+  for (const p of document.querySelectorAll('.panel')) p.hidden = p.dataset.panel !== name;
 }
 
 // Echo fidelity. Put the current ancestor alone in a scratch grid, give it one turn with
@@ -114,8 +127,10 @@ async function probe() {
     const fidelity = exact ? 'exact' : `${(sim * 100).toFixed(0)}% of lines kept`;
     $('probe-v').textContent = `${fidelity}, ${ev.effects.length} call${ev.effects.length === 1 ? '' : 's'}, ${secs}s`;
     $('cell-head').textContent = `probe: echo ${fidelity}${usageText(ev.usage)}  ${secs}s`;
-    $('genome').value = md;
+    $('prompt').textContent = renderMessages(prompt(scratch, 1, 1, md, opts).messages);
+    $('genome').textContent = md;
     $('output').textContent = describe(ev) + '\n\n' + ev.out;
+    showTab('cell');
   } finally {
     setBusy(false);
   }
@@ -195,6 +210,8 @@ async function init() {
     $('engine').appendChild(o);
   }
   $('ancestor').value = (await (await fetch('./ancestor.md')).text()).trim();
+  $('manual').textContent = MANUAL;
+  for (const b of document.querySelectorAll('nav [role=tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
   $('gpu').textContent = navigator.gpu ? `gpu: ${await describeAdapter()}` : 'gpu: WebGPU not available in this browser';
   bind('temperature', 'temperature');
   bind('slice', 'maxTokens');

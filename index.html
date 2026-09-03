@@ -7,29 +7,37 @@
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: #0a0b0c; color: #c9c4b8; font: 11px/1.4 ui-monospace, "IBM Plex Mono", Consolas, monospace; }
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; padding: 16px; height: 100vh; }
-  .stage { min-width: 0; min-height: 0; aspect-ratio: 1; max-height: calc(100vh - 32px); justify-self: center; width: min(100%, calc(100vh - 32px)); }
+  body { margin: 0; background: #0a0b0c; color: #c9c4b8; font: 8px/1.45 ui-monospace, "IBM Plex Mono", Consolas, monospace; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; padding: 12px; height: 100vh; }
+  .stage { min-width: 0; min-height: 0; aspect-ratio: 1; max-height: calc(100vh - 24px); justify-self: center; width: min(100%, calc(100vh - 24px)); }
   #grid { width: 100%; height: 100%; display: block; background: #0a0b0c; }
-  aside { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; }
-  h1 { font-size: 11px; font-weight: 600; margin: 0; letter-spacing: .08em; text-transform: uppercase; color: #8fa39b; }
-  fieldset { border: 1px solid #23262a; padding: 10px 12px; margin: 0; }
-  legend { padding: 0 6px; color: #8fa39b; }
-  label { display: grid; grid-template-columns: 90px 1fr 48px; align-items: center; gap: 8px; margin: 6px 0; }
-  input[type=range] { width: 100%; }
-  select, button { font: inherit; background: #15181b; color: inherit; border: 1px solid #2d3136; padding: 4px 8px; }
+  aside { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  h1 { font-size: 9px; font-weight: 600; margin: 0; letter-spacing: .08em; text-transform: uppercase; color: #8fa39b; }
+  #gpu { color: #8fa39b; }
+  #status { color: #8fa39b; font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 8px; }
+  nav { display: flex; gap: 2px; border-bottom: 1px solid #23262a; }
+  nav button { background: none; border: 1px solid transparent; border-bottom: none; color: #8fa39b; padding: 3px 10px; font: inherit; cursor: pointer; }
+  nav button[aria-selected=true] { color: #e6e1d6; border-color: #23262a; background: #101214; }
+  .panel { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: auto; flex: 1; }
+  .panel[hidden] { display: none; }
+  fieldset { border: 1px solid #23262a; padding: 6px 8px; margin: 0; }
+  legend { padding: 0 4px; color: #8fa39b; }
+  label { display: grid; grid-template-columns: 72px 1fr 40px; align-items: center; gap: 6px; margin: 4px 0; }
+  input[type=range] { width: 100%; height: 10px; }
+  select, button { font: inherit; background: #15181b; color: inherit; border: 1px solid #2d3136; padding: 3px 6px; }
   button { cursor: pointer; }
   button:hover { border-color: #6b8f84; }
+  button:disabled { opacity: .5; cursor: default; }
   :focus-visible { outline: 2px solid #6b8f84; outline-offset: 2px; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .box { background: #101214; border: 1px solid #23262a; padding: 5px; color: #e6e1d6; }
+  .box.role { color: #8fa39b; }
   #stats { color: #e6e1d6; }
-  #ancestor { width: 100%; height: 200px; font: inherit; background: #101214; color: #e6e1d6; border: 1px solid #23262a; padding: 6px; resize: vertical; }
-  #probe-v { align-self: center; color: #8fa39b; }
-  #genome { width: 100%; height: 150px; font: inherit; background: #101214; color: #e6e1d6; border: 1px solid #23262a; padding: 6px; resize: vertical; }
-  #output { max-height: 220px; overflow: auto; background: #101214; border: 1px solid #23262a; padding: 6px; }
-  #gpu { color: #8fa39b; margin-top: -8px; }
-  #status { color: #8fa39b; font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 8px; }
+  textarea { width: 100%; font: inherit; background: #101214; color: #e6e1d6; border: 1px solid #23262a; padding: 5px; resize: vertical; }
+  #ancestor { height: 180px; }
+  #probe-v { color: #8fa39b; }
+  details summary { cursor: pointer; color: #8fa39b; }
   @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } .stage { max-height: none; width: 100%; } }
 </style>
 </head>
@@ -39,39 +47,74 @@
   <aside>
     <h1>Soup <span id="status"></span></h1>
     <div id="gpu"></div>
-    <fieldset>
-      <legend>run</legend>
-      <div class="row">
-        <button id="run">Run</button>
-        <button id="step">Step</button>
-        <button id="reset">Reset</button>
-        <button id="export">Export</button>
-      </div>
-      <label>engine <select id="engine"><option value="mock">mock</option></select><span></span></label>
-      <label>grid <select id="size"><option>8</option><option selected>12</option><option>16</option><option>20</option><option>32</option></select><span></span></label>
-      <label>ticks/frame <input id="tpf" type="range" min="1" max="200" value="20"><span id="tpf-v"></span></label>
-    </fieldset>
-    <fieldset>
-      <legend>physics</legend>
-      <label>temperature <input id="temperature" type="range" min="0" max="2" step="0.05" value="0.7"><span id="temperature-v"></span></label>
-      <label>slice (tokens) <input id="slice" type="range" min="10" max="800" step="10" value="300"><span id="slice-v"></span></label>
-      <label>copy noise <input id="noise" type="range" min="0" max="0.02" step="0.0005" value="0"><span id="noise-v"></span></label>
-    </fieldset>
-    <fieldset>
-      <legend>ancestor (seed: Reset places this in the centre cell)</legend>
-      <textarea id="ancestor" spellcheck="false"></textarea>
-      <div class="row"><button id="probe">Probe</button><span id="probe-v"></span></div>
-    </fieldset>
-    <fieldset>
-      <legend>soup</legend>
-      <pre id="stats"></pre>
-    </fieldset>
-    <fieldset>
-      <legend>selected cell (read-only: click a cell on the grid)</legend>
-      <pre id="cell-head">click a cell to inspect its text and last turn</pre>
-      <textarea id="genome" readonly spellcheck="false"></textarea>
-      <pre id="output"></pre>
-    </fieldset>
+    <nav role="tablist">
+      <button role="tab" data-tab="run" aria-selected="true">run</button>
+      <button role="tab" data-tab="cell" aria-selected="false">cell</button>
+      <button role="tab" data-tab="setup" aria-selected="false">setup</button>
+    </nav>
+
+    <section class="panel" data-panel="run">
+      <fieldset>
+        <legend>run</legend>
+        <div class="row">
+          <button id="run">Run</button>
+          <button id="step">Step</button>
+          <button id="reset">Reset</button>
+          <button id="export">Export</button>
+        </div>
+        <label>engine <select id="engine"><option value="mock">mock</option></select><span></span></label>
+        <label>grid <select id="size"><option>8</option><option selected>12</option><option>16</option><option>20</option><option>32</option></select><span></span></label>
+        <label>ticks/frame <input id="tpf" type="range" min="1" max="200" value="20"><span id="tpf-v"></span></label>
+      </fieldset>
+      <fieldset>
+        <legend>physics</legend>
+        <label>temperature <input id="temperature" type="range" min="0" max="2" step="0.05" value="0.7"><span id="temperature-v"></span></label>
+        <label>slice (tokens) <input id="slice" type="range" min="10" max="800" step="10" value="300"><span id="slice-v"></span></label>
+        <label>copy noise <input id="noise" type="range" min="0" max="0.02" step="0.0005" value="0"><span id="noise-v"></span></label>
+      </fieldset>
+      <fieldset>
+        <legend>soup</legend>
+        <pre id="stats"></pre>
+      </fieldset>
+    </section>
+
+    <section class="panel" data-panel="cell" hidden>
+      <pre id="cell-head" class="box role">click a cell on the grid</pre>
+      <fieldset>
+        <legend>sent to the model</legend>
+        <pre id="prompt" class="box"></pre>
+      </fieldset>
+      <fieldset>
+        <legend>last reply</legend>
+        <pre id="output" class="box"></pre>
+      </fieldset>
+      <details>
+        <summary>raw document (slots unexpanded)</summary>
+        <pre id="genome" class="box"></pre>
+      </details>
+    </section>
+
+    <section class="panel" data-panel="setup" hidden>
+      <fieldset>
+        <legend>ancestor (seed: Reset places this in the centre cell)</legend>
+        <textarea id="ancestor" spellcheck="false"></textarea>
+        <div class="row"><button id="probe">Probe</button><span id="probe-v"></span></div>
+      </fieldset>
+      <fieldset>
+        <legend>what {{actions}} expands to</legend>
+        <pre id="manual" class="box"></pre>
+      </fieldset>
+      <fieldset>
+        <legend>slots</legend>
+        <pre class="box">{{self}}       this document, raw
+{{pos}}        coordinates
+{{empty}}      empty neighbours, e.g. S, W
+{{occupied}}   occupied neighbours
+{{N}} {{E}} {{S}} {{W}}   a neighbour's document
+{{tokens}}     the slice for this turn
+{{actions}}    the manual above</pre>
+      </fieldset>
+    </section>
   </aside>
 </main>
 <script type="module" src="./src/main.js"></script>
