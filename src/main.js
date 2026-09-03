@@ -14,7 +14,7 @@ const $ = id => document.getElementById(id);
 
 // Copy noise is the mutation rate, and at zero there is no evolution: every copy is
 // exact, so nothing varies and nothing can be selected. It is on by default.
-const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, ticksPerFrame: 20 };
+const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, steps: 1 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -195,7 +195,8 @@ const yieldToBrowser = () => new Promise(r => setTimeout(r, 0));
 
 async function loop() {
   while (running) {
-    const per = engine.instant ? opts.ticksPerFrame : 1;
+    // A slow engine draws every turn; an instant one would spend all its time drawing.
+    const per = engine.instant ? Math.max(20, opts.steps) : 1;
     for (let k = 0; k < per && running; k++) {
       inFlight = sched.step();
       view.draw();   // show the working mark now, even where animation frames are paused
@@ -324,7 +325,7 @@ async function init() {
   bind('budget', 'budget');
   $('grammar').checked = opts.grammar;
   $('grammar').addEventListener('change', () => { opts.grammar = $('grammar').checked; });
-  bind('tpf', 'ticksPerFrame');
+  bind('steps', 'steps');
   engine = await makeEngine($('engine').value);
   reset();
 
@@ -339,20 +340,25 @@ async function init() {
   $('step').addEventListener('click', async () => {
     if (running || busy) return;
     setBusy(true);
+    const want = Math.max(1, opts.steps);
     try {
-      inFlight = sched.step();
-      view.draw();
-      const ev = await inFlight.finally(() => { inFlight = null; });
-      view.draw();
-      showStats();
-      if (ev) view.select(ev.y * soup.w + ev.x);
-      else $('status').textContent = 'soup is dead';
+      for (let k = 0; k < want; k++) {
+        $('step').textContent = want > 1 ? `Step ${k + 1}/${want}` : 'Step';
+        inFlight = sched.step();
+        view.draw();
+        const ev = await inFlight.finally(() => { inFlight = null; });
+        view.draw();
+        showStats();
+        if (!ev) { $('status').textContent = 'soup is dead'; break; }
+        view.select(ev.y * soup.w + ev.x);
+      }
       save();
     } catch (err) {
       // A GPU reset should cost a model rebuild, not the run, whether stepping or running.
       if (err?.deviceLost && await recoverEngine()) return;
       failed(err);
     } finally {
+      $('step').textContent = 'Step';
       setBusy(false);
     }
   });
