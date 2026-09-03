@@ -34,11 +34,15 @@ export function viPrompt(md) {
 // and it is meant to be a cheap one — `ggyGLggVGp` passes, `reproduce` does not. A reply
 // with nothing usable in it runs nothing, because prose executed as vi is destruction,
 // and a turn that said nothing usable has still spent its slice.
-const FENCE = /```[a-z]*\n([\s\S]*?)```/gi;
+const FENCE = /```[a-z]*\r?\n([\s\S]*?)```/gi;
 const TICKS = /`([^`\n]+)`/g;
 
 export function keystrokesFrom(reply) {
-  const text = String(reply ?? '');
+  // Line endings are normalised first: a file saved with CRLF would otherwise miss the
+  // fence entirely and every backticked word in the prose would be read as keystrokes.
+  // Line endings are normalised first: a file saved with CRLF would otherwise miss the
+  // fence entirely and every backticked word in the prose would be read as keystrokes.
+  const text = String(reply ?? '').replace(/\r\n?/g, '\n');
 
   const fenced = [...text.matchAll(FENCE)].map(m => m[1].trim()).filter(Boolean);
   if (fenced.length) return fenced.join('').replace(/\n+/g, '');

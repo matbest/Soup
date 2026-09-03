@@ -478,7 +478,8 @@ async function loadFreeModels() {
 // written in the same language.
 async function loadAncestor() {
   const file = opts.mode === 'vi' ? './ancestor-vi.md' : './ancestor.md';
-  $('ancestor').value = (await (await fetch(file)).text()).trim();
+  // Normalised, so a seed saved with Windows line endings still parses the same.
+  $('ancestor').value = (await (await fetch(file)).text()).replace(/\r\n?/g, '\n').trim();
 }
 
 // Everything a run knows, in one object: the grid, the settings, and the recent turns.

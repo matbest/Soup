@@ -17,11 +17,11 @@ export function createMockEngine({ rng = Math.random, chatter = 0.02 } = {}) {
     async unload() {},
     async reset() {},
     async complete({ messages, maxTokens }) {
-      const promptText = messages[messages.length - 1].content;
+      const promptText = messages[messages.length - 1].content.replace(/\r\n?/g, '\n');
       // A vi cell's whole prompt is its own text, so there is no marker to look for: if it
       // carries a fenced block, this stands in for a model that finds it and echoes it,
       // with a chance of getting one character wrong.
-      const fenced = /```[a-z]*\n([\s\S]*?)```/i.exec(promptText);
+      const fenced = /```[a-z]*\r?\n([\s\S]*?)```/i.exec(promptText);
       if (fenced) {
         let keys = fenced[1].trim().split('\n')[0];
         if (keys && rng() < chatter * 5) {
