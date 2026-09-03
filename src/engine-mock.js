@@ -12,6 +12,7 @@ export function createMockEngine({ rng = Math.random, chatter = 0.02 } = {}) {
     lastUsage: null,
     gpu: null,
     async load() {},
+    async unload() {},
     async complete({ slots, maxTokens }) {
       const empties = slots.empty === 'none' ? [] : slots.empty.split(', ');
       const pool = empties.length ? empties : DIR_NAMES;

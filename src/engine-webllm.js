@@ -60,14 +60,34 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
         throw err;
       }
     },
+    async unload() {
+      try { await engine?.unload(); } catch { /* already gone */ }
+      engine = null;
+    },
     async complete({ messages, schema, maxTokens, temperature }) {
-      const r = await engine.chat.completions.create({
+      const request = {
         response_format: schema ? { type: 'json_object', schema } : undefined,
         messages,
         max_tokens: maxTokens,
         temperature,
         top_p: 1,
-      });
+      };
+      let r;
+      try {
+        r = await engine.chat.completions.create(request);
+      } catch (err) {
+        // WebLLM keeps one grammar matcher per loaded model and, if a turn throws between
+        // freeing the old matcher and making the new one, keeps pointing at the freed
+        // object: every later constrained turn then fails with "deleted object". There
+        // is no call to clear it short of reloading the model, so do that (weights are
+        // cached) and retry once.
+        if (!/deleted object|GrammarMatcher/i.test(err?.message ?? String(err))) throw err;
+        console.warn('[soup] grammar matcher was freed; reloading the model and retrying', err);
+        onProgress?.('recovering: reloading the model');
+        await engine.reload(modelId);
+        onProgress?.(modelId);
+        r = await engine.chat.completions.create(request);
+      }
       self.lastUsage = r.usage ?? null;
       const text = r.choices?.[0]?.message?.content ?? '';
       // Belt and braces: never return more than the slice, whatever the model says.

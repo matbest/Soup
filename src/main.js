@@ -243,7 +243,9 @@ async function init() {
   $('size').addEventListener('change', async () => { await stop(); reset(); });
   $('engine').addEventListener('change', async () => {
     await stop();
+    const old = engine;
     engine = await makeEngine($('engine').value);
+    if (old !== engine) await old.unload?.();   // never leave two models on the GPU
     reset();
   });
   $('export').addEventListener('click', () => {
