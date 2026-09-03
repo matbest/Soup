@@ -362,6 +362,13 @@ turns the writing in the cells off.
 Hovering a cell on the grid shows what is in it and what the model said when it last ran,
 without leaving the run tab. Clicking one opens the same thing in full on the cell tab.
 
+The **population** tab lists the distinct texts by how many cells carry them, how old they
+are and how deep the lineage runs — click one to load it into the ancestor box. Below it,
+a soup can be kept under a name, downloaded, opened from a file, or started again. Named
+soups sit beside the automatic saves in `runs/` and are listed newest first; clicking one
+loads it back, tick and lineage intact. The naming matters because `latest.json` is
+overwritten every twenty ticks, so a run worth returning to needs a name of its own.
+
 The **vi** tab is a bench for trying it by hand: a window of the grid around the cursor,
 the keystroke stream shown key by key (click any key to run up to that point), Step and
 Back, presets, and a box to type straight in. *Apply as new start* takes the result as the

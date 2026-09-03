@@ -288,6 +288,7 @@ function showTab(name) {
   for (const p of document.querySelectorAll('.panel')) p.hidden = p.dataset.panel !== name;
   // The vi bench wants the whole screen, so it covers everything else while it is open.
   $('vi-panel').hidden = name !== 'vi';
+  if (name === 'pop') listSaves();
   if (name === 'vi') {
     if (!viLab) { viLab = createViLab(); viLab.mount(); }
     else viLab.render();
@@ -514,6 +515,11 @@ async function init() {
     }
   });
   $('probe').addEventListener('click', probe);
+  $('reset2').addEventListener('click', async () => { await stop(); reset(); });
+  $('export2').addEventListener('click', () => $('export').click());
+  $('load2').addEventListener('click', () => $('loadfile').click());
+  $('save-as').addEventListener('click', saveNamed);
+  $('save-name').addEventListener('keydown', e => { if (e.key === 'Enter') saveNamed(); });
   $('reset').addEventListener('click', async () => { await stop(); reset(); });
   $('size').addEventListener('change', async () => { await stop(); reset(); });
   $('engine').addEventListener('change', async () => {
@@ -591,6 +597,48 @@ async function loadAncestor() {
   const file = opts.mode === 'vi' ? (min ? './ancestor-vi-min.md' : './ancestor-vi.md') : './ancestor.md';
   // Normalised, so a seed saved with Windows line endings still parses the same.
   $('ancestor').value = (await (await fetch(file)).text()).replace(/\r\n?/g, '\n').trim();
+}
+
+// Keep the soup under a name, so a run worth returning to is not overwritten by the next
+// autosave. The dev server writes it beside the automatic ones.
+async function saveNamed() {
+  const raw = $('save-name').value.trim() || `soup-t${soup.tick}`;
+  const name = raw.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+  if (!name) return;
+  const file = name.endsWith('.json') ? name : `${name}.json`;
+  $('save-note').textContent = `saving ${file}`;
+  const before = saveBroken;
+  await save(file);
+  $('save-note').textContent = saveBroken && !before
+    ? 'no save endpoint — run `python serve.py` to keep soups on disk'
+    : `saved ${file}`;
+  $('save-name').value = '';
+  listSaves();
+}
+
+// What has been kept, newest first. Only the development server offers this.
+async function listSaves() {
+  const box = $('saves');
+  try {
+    const saves = await (await fetch('/saves')).json();
+    box.innerHTML = '';
+    if (!saves.length) { box.textContent = 'nothing saved yet'; return; }
+    for (const f of saves.sort((a, b) => b.modified - a.modified)) {
+      const el = document.createElement('pre');
+      el.className = 'save';
+      el.textContent = `${f.name}   ${(f.bytes / 1024).toFixed(0)} kB   ${new Date(f.modified * 1000).toLocaleString()}`;
+      el.addEventListener('click', async () => {
+        await stop();
+        try {
+          loadDump(await (await fetch(`/runs/${f.name}`)).json());
+          $('status').textContent = `loaded ${f.name}`;
+        } catch (err) { failed(err); }
+      });
+      box.appendChild(el);
+    }
+  } catch {
+    box.textContent = 'no save endpoint — run `python serve.py` to keep soups on disk';
+  }
 }
 
 // Everything a run knows, in one object: the grid, the settings, and the recent turns.

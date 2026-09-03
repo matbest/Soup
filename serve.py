@@ -22,6 +22,29 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-store')
         super().end_headers()
 
+    def do_GET(self):
+        # A listing of what has been saved, so the page can offer them without the
+        # visitor hunting through a folder.
+        if self.path.rstrip('/') == '/saves':
+            root = os.path.dirname(os.path.abspath(__file__))
+            directory = os.path.join(root, RUNS)
+            saves = []
+            if os.path.isdir(directory):
+                for name in sorted(os.listdir(directory)):
+                    if not name.endswith('.json'):
+                        continue
+                    full = os.path.join(directory, name)
+                    saves.append({'name': name, 'bytes': os.path.getsize(full),
+                                  'modified': int(os.path.getmtime(full))})
+            payload = json.dumps(saves).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+        super().do_GET()
+
     def do_POST(self):
         if not self.path.startswith('/save/'):
             self.send_error(404, 'only /save/<name> accepts POST')

@@ -40,6 +40,10 @@
   #orkey { margin-bottom: 4px; }
   #or-note { align-self: center; color: #8fa39b; }
   #probe-v { color: #8fa39b; }
+  #save-name { width: 150px; background: #101214; color: #e6e1d6; border: 1px solid #23262a; padding: 3px 5px; font: inherit; }
+  #save-note { color: #8fa39b; }
+  .save { background: #101214; border: 1px solid #23262a; padding: 4px 6px; margin-bottom: 3px; cursor: pointer; color: #e6e1d6; }
+  .save:hover { border-color: #6b8f84; }
   .genome { background: #101214; border: 1px solid #23262a; padding: 4px; margin-bottom: 3px; cursor: pointer; color: #e6e1d6; }
   .genome:hover { border-color: #6b8f84; }
   details summary { cursor: pointer; color: #8fa39b; }
@@ -88,6 +92,7 @@
     <nav role="tablist">
       <button role="tab" data-tab="run" aria-selected="true">run</button>
       <button role="tab" data-tab="cell" aria-selected="false">cell</button>
+      <button role="tab" data-tab="pop" aria-selected="false">population</button>
       <button role="tab" data-tab="setup" aria-selected="false">setup</button>
       <button role="tab" data-tab="vi" aria-selected="false">vi</button>
     </nav>
@@ -127,10 +132,7 @@
         <legend>soup</legend>
         <pre id="stats"></pre>
       </fieldset>
-      <fieldset>
-        <legend>population (what persists; click to seed the ancestor)</legend>
-        <div id="pop"></div>
-      </fieldset>
+
     </section>
 
     <section class="panel" data-panel="cell" hidden>
@@ -147,6 +149,28 @@
         <summary id="prompt-head">sent to the model</summary>
         <pre id="prompt" class="box"></pre>
       </details>
+    </section>
+
+    <section class="panel" data-panel="pop" hidden>
+      <fieldset>
+        <legend>what persists (click a genome to seed the ancestor from it)</legend>
+        <div id="pop"></div>
+      </fieldset>
+      <fieldset>
+        <legend>keep this soup</legend>
+        <div class="row">
+          <input id="save-name" placeholder="a name for it" spellcheck="false">
+          <button id="save-as">Save</button>
+          <button id="export2">Download</button>
+          <button id="load2">Open a file…</button>
+          <button id="reset2">Start again</button>
+        </div>
+        <span id="save-note"></span>
+      </fieldset>
+      <fieldset>
+        <legend>saved soups (click one to load it)</legend>
+        <div id="saves"></div>
+      </fieldset>
     </section>
 
     <section class="panel" data-panel="setup" hidden>
