@@ -208,13 +208,20 @@ select all, paste over) give: `ggyGKggVGp` reproduces north instead; `ggyGLgVGp`
 rather than replaces; `ggyGLggVGq` is sterile; `xgyGLggVGp` damages itself and then copies
 the damage. All of them run.
 
-A turn edits five buffers — self, north, south, east, west. `h j k l` move the cursor
-inside a buffer; `H J K L` move to the west, south, north and east cell. There is no
-filesystem and no `:w`: a buffer is a cell and editing it is the write. One register,
-belonging to the turn, is what carries text between cells. A cell's cursor position is
-part of its state, so where a lineage leaves its cursor is inherited with its text.
+The cursor starts in the cell whose turn it is and walks the grid. `h j k l` move it
+inside a cell; `H J K L` move it one whole cell west, south, north or east, and keep
+going — `LL` is two cells east, `3K` is three cells north. Reach is bounded by nothing but
+what a turn can afford in keystrokes, so distance is a price rather than a rule. There is
+no filesystem and no `:w`: a cell is a buffer and editing it is the write. One register,
+belonging to the turn, carries text between cells. A cell's cursor position is part of its
+state, so where a lineage leaves its cursor is inherited with its text.
 
-The **vi** tab is a bench for trying it by hand: five buffers laid out around the cursor,
+Special keys are spelled in vim's own key notation (`:help key-notation`): `<Esc>`,
+`<CR>`, `<BS>`, `<Tab>`, `<Space>`. Pressing those keys with *type straight in* enabled
+appends the same spelling, so what you type by hand and what a model writes are one
+language.
+
+The **vi** tab is a bench for trying it by hand: a window of the grid around the cursor,
 the keystroke stream shown key by key (click any key to run up to that point), Step and
 Back, presets, and a box to type straight in. *Apply as new start* takes the result as the
 next starting point, the way one turn hands on to the next.

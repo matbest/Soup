@@ -5,21 +5,23 @@
 // program that does something — Tierra's property, that no bit pattern is illegal, in a
 // language people already write in.
 //
-// A turn edits a neighbourhood of five buffers: self, north, south, east, west. There is
-// no filesystem and no :w — a buffer is a cell, and editing it is the write. H J K L
-// switch which buffer the cursor is in; h j k l move the cursor inside it. One register,
-// belonging to the turn, is what carries text from one cell to another.
+// The cursor is somewhere on the grid, starting in the cell whose turn it is. h j k l
+// move it inside the current cell; H J K L move it one whole cell west, south, north or
+// east, and keep going: LL is two cells east. Reach is not bounded by a rule, only by
+// what a turn can afford in keystrokes. There is no filesystem and no :w — a buffer is a
+// cell, and editing it is the write. One register, belonging to the turn, is what carries
+// text from one cell to another.
 //
 // Cursor position is part of a cell's state, so where a lineage leaves its cursor is
 // inherited along with its text.
 
-export const PATHS = ['self', 'north', 'south', 'east', 'west'];
-export const CELL_KEYS = { H: 'west', J: 'south', K: 'north', L: 'east' };
+// Which way each key steps, in cells.
+export const CELL_KEYS = { H: [-1, 0], J: [0, 1], K: [0, -1], L: [1, 0] };
 
 const SPECIAL = { '<Esc>': 'Esc', '<CR>': 'CR', '<Enter>': 'CR', '<BS>': 'BS', '<Tab>': 'Tab', '<Space>': ' ' };
 
 // A keystroke string as the model writes it: literal characters, plus <Esc> and friends
-// spelled out, and newlines treated as Enter.
+// spelled out in vim's own key notation, and newlines treated as Enter.
 export function tokenize(input) {
   const keys = [];
   for (let i = 0; i < input.length; ) {
@@ -49,21 +51,18 @@ function makeBuffer(text, cursor) {
   };
 }
 
-// Run a keystroke string over a neighbourhood.
+// Run a keystroke string over the grid, starting in the cell at the origin.
 //
-//   cells: { self: {text, cursor}, north: …, … }   a missing or null cell is an empty buffer
-//   returns { cells, mode, at, register, log, keys }
+//   getCell(dx, dy) -> { text, cursor } | null      relative to the cell whose turn it is
+//   returns { cells, at, mode, register, log, keys }
+//     cells: Map of "dx,dy" -> { dx, dy, text, cursor, changed } for every cell touched
 //
 // `limit` caps how many keys are executed, so a runaway string costs what it costs and
 // then stops.
-export function run(cells, input, { limit = 4000 } = {}) {
-  const bufs = {};
-  for (const p of PATHS) bufs[p] = makeBuffer(cells?.[p]?.text ?? null, cells?.[p]?.cursor);
-  const present = {};
-  for (const p of PATHS) present[p] = (cells?.[p]?.text ?? null) !== null;
-
+export function run(getCell, input, { limit = 4000 } = {}) {
+  const bufs = new Map();
   const state = {
-    at: 'self',
+    dx: 0, dy: 0,
     mode: 'normal',
     register: { text: '', linewise: false },
     pending: '',        // operator or multi-key prefix, e.g. 'd', 'g'
@@ -71,31 +70,60 @@ export function run(cells, input, { limit = 4000 } = {}) {
     opCount: 1,         // the count typed before an operator, kept until its motion lands
     visual: null,       // {line} anchor while in visual-line mode
     log: [],
-    changed: new Set(),
   };
 
-  const buf = () => bufs[state.at];
+  const key = (dx, dy) => `${dx},${dy}`;
+
+  // A cell is only fetched when the cursor reaches it, so a turn pays for what it visits.
+  function bufAt(dx, dy) {
+    const id = key(dx, dy);
+    let b = bufs.get(id);
+    if (!b) {
+      const cell = getCell(dx, dy) ?? null;
+      const text = cell?.text ?? null;
+      const lines = (text ?? '').split('\n');
+      b = {
+        dx, dy,
+        lines: lines.length ? lines : [''],
+        line: clamp(cell?.cursor?.line ?? 0, 0, Math.max(0, lines.length - 1)),
+        col: Math.max(0, cell?.cursor?.col ?? 0),
+        present: text !== null,
+        changed: false,
+      };
+      bufs.set(id, b);
+    }
+    return b;
+  }
+
+  const buf = () => bufAt(state.dx, state.dy);
   const cur = () => buf().lines[buf().line] ?? '';
-  const note = what => state.log.push(`${state.at}: ${what}`);
-  const touch = () => { state.changed.add(state.at); present[state.at] = true; };
+  const note = what => state.log.push(`(${state.dx},${state.dy}): ${what}`);
+  const touch = () => { const b = buf(); b.changed = true; b.present = true; };
 
   const keys = tokenize(input).slice(0, limit);
-  for (const key of keys) {
-    if (state.mode === 'insert') insertKey(key);
-    else normalKey(key);
+  for (const k of keys) {
+    if (state.mode === 'insert') insertKey(k);
+    else normalKey(k);
   }
 
-  const out = {};
-  for (const p of PATHS) {
-    const b = bufs[p];
+  const cells = new Map();
+  for (const [id, b] of bufs) {
     const text = b.lines.join('\n');
-    out[p] = {
-      text: present[p] && text.trim() !== '' ? text : null,
+    cells.set(id, {
+      dx: b.dx, dy: b.dy,
+      text: b.present && text.trim() !== '' ? text : null,
       cursor: { line: b.line, col: b.col },
-      changed: state.changed.has(p),
-    };
+      changed: b.changed,
+    });
   }
-  return { cells: out, mode: state.visual ? 'visual' : state.mode, at: state.at, register: state.register, log: state.log, keys: keys.length };
+  return {
+    cells,
+    at: { dx: state.dx, dy: state.dy },
+    mode: state.visual ? 'visual' : state.mode,
+    register: state.register,
+    log: state.log,
+    keys: keys.length,
+  };
 
   // ---- insert mode -------------------------------------------------------------
 
@@ -165,8 +193,6 @@ export function run(cells, input, { limit = 4000 } = {}) {
       return;
     }
 
-    state.count = '';
-
     // Visual line mode: V, a motion, then an operator over the selected lines. `p` over a
     // selection replaces it, which is how one cell's text becomes another's.
     if (state.visual) {
@@ -184,15 +210,21 @@ export function run(cells, input, { limit = 4000 } = {}) {
     }
     if (key === 'V') { state.visual = { line: b.line }; return; }
 
-    // Which buffer the cursor is in. These are the only way between cells.
+    // One whole cell in that direction, and it keeps going: LL is two cells east. These
+    // are the only way between cells, and each step costs a keystroke.
     if (key in CELL_KEYS) {
-      state.at = CELL_KEYS[key];
+      const [ddx, ddy] = CELL_KEYS[key];
+      state.dx += ddx * n;
+      state.dy += ddy * n;
       const nb = buf();
       nb.line = clamp(nb.line, 0, nb.lines.length - 1);
       nb.col = clamp(nb.col, 0, Math.max(0, (nb.lines[nb.line] ?? '').length));
-      note(`moved to ${state.at}`);
+      note(`moved ${key} to (${state.dx},${state.dy})`);
+      state.count = '';
       return;
     }
+
+    state.count = '';
 
     switch (key) {
       case 'h': case 'l': case 'j': case 'k': case 'w': case 'b': case 'e':

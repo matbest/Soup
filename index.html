@@ -56,6 +56,8 @@
   .vibuf { border: 1px solid #23262a; background: #101214; display: flex; flex-direction: column; min-height: 90px; overflow: auto; }
   .vibuf.blank { border: none; background: none; }
   .vibuf.here { border-color: #6b8f84; }
+  .vibuf.mother .vibuf-head { color: #cbb26b; }
+  .vibuf-body { max-height: 130px; }
   .vibuf.changed .vibuf-head { color: #e0b0a0; }
   .vibuf-head { padding: 2px 5px; color: #8fa39b; border-bottom: 1px solid #23262a; }
   .vibuf-body { padding: 5px; margin: 0; color: #e6e1d6; }
@@ -169,13 +171,14 @@ a run paces itself. No GPU needed.</pre>
   <div id="vi-stream"></div>
   <div class="row" id="vi-presets"></div>
   <div id="vi-grid"></div>
-  <pre class="box" id="vi-help">h j k l  0 ^ $  w b e  gg G  {count}       move the cursor
-H J K L                                    move to the west / south / north / east cell
+  <pre class="box" id="vi-help">h j k l  0 ^ $  w b e  gg G  {count}       move the cursor inside a cell
+H J K L   2L   3K                          move one cell west / south / north / east, and keep going
 i a I A o O   <Esc>                        insert
 x D r{ch}  dd dw d$ dG  cc cw C  2dd       delete and change
 yy Y ygg yG   p P                          yank and paste (one register, shared across cells)
 V then a motion then d y c p               visual line: p replaces the selection
-Reproduction is ggyGLggVGp: yank all, move east, select all, paste over.</pre>
+Reproduction is ggyGLggVGp: yank all, move one east, select all, paste over.
+Reach costs keystrokes and nothing else: ggyG3LggVGp writes three cells away.</pre>
 </section>
 <script type="module" src="./src/main.js"></script>
 </body>

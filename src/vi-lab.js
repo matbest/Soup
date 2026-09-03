@@ -1,53 +1,52 @@
-// A bench for the vi emulator: five buffers, a keystroke string, and the result.
+// A bench for the vi emulator: a patch of grid, a keystroke string, and the result.
 //
-// The state is the starting buffers plus the keys typed so far, and every change re-runs
+// The state is the starting cells plus the keys typed so far, and every change re-runs
 // the whole string from the start. That keeps `run` pure and makes stepping, undoing and
 // editing the string all the same operation.
 
-import { run, PATHS, CELL_KEYS, tokenize } from './vi.js';
+import { run, CELL_KEYS, tokenize } from './vi.js';
 
 const $ = id => document.getElementById(id);
-const LAYOUT = [[null, 'north', null], ['west', 'self', 'east'], [null, 'south', null]];
 
 const PRESETS = [
   ['reproduce east', 'ggyGLggVGp'],
   ['reproduce north', 'ggyGKggVGp'],
+  ['reproduce two east', 'ggyG2LggVGp'],
   ['append to east', 'ggyGLGp'],
   ['their example', 'jjwwihello<Esc>'],
-  ['scribble on north', 'KGoscribbled<Esc>'],
+  ['walk and scribble', 'LLGoscribbled<Esc>'],
   ['delete east', 'LggVGd'],
 ];
 
 const START = {
-  self: '# Cell\nreproduce.',
-  north: 'a neighbour\nwith two lines',
-  south: null,
-  east: 'old east',
-  west: null,
+  '0,0': '# Cell\nreproduce.',
+  '0,-1': 'a neighbour\nwith two lines',
+  '1,0': 'old east',
+  '2,0': 'far east',
 };
 
 export function createViLab() {
   let start = { ...START };
   let keys = '';
-  let stepAt = null;   // how many keys to run when stepping; null means all
+  let stepAt = null;   // how many keys to run; null means all of them
   let capturing = false;
 
-  function state() {
-    const cells = {};
-    for (const p of PATHS) cells[p] = start[p] === null ? null : { text: start[p], cursor: { line: 0, col: 0 } };
-    const limit = stepAt === null ? 4000 : stepAt;
-    return run(cells, keys, { limit });
-  }
+  const state = () => run(
+    (dx, dy) => (start[`${dx},${dy}`] !== undefined ? { text: start[`${dx},${dy}`], cursor: { line: 0, col: 0 } } : null),
+    keys,
+    { limit: stepAt === null ? 4000 : stepAt },
+  );
 
   function render() {
     const r = state();
     const all = tokenize(keys);
     const shown = stepAt === null ? all.length : Math.min(stepAt, all.length);
 
-    $('vi-keys').value = keys;
+    if ($('vi-keys').value !== keys) $('vi-keys').value = keys;
     $('vi-mode').textContent =
-      `mode ${r.mode}   buffer ${r.at}   cursor ${r.cells[r.at].cursor.line},${r.cells[r.at].cursor.col}   ` +
-      `keys ${shown}/${all.length}   register ${r.register.linewise ? '(lines) ' : ''}${JSON.stringify(r.register.text).slice(0, 60)}`;
+      `mode ${r.mode}   cell (${r.at.dx},${r.at.dy})   cursor ${r.cells.get(`${r.at.dx},${r.at.dy}`)?.cursor.line ?? 0},` +
+      `${r.cells.get(`${r.at.dx},${r.at.dy}`)?.cursor.col ?? 0}   keys ${shown}/${all.length}   ` +
+      `register ${r.register.linewise ? '(lines) ' : ''}${JSON.stringify(r.register.text).slice(0, 50)}`;
 
     $('vi-stream').innerHTML = '';
     all.forEach((k, i) => {
@@ -58,46 +57,53 @@ export function createViLab() {
       $('vi-stream').appendChild(el);
     });
 
+    // A window wide enough for the mother, everything touched, and a ring of empties.
+    const xs = [0, r.at.dx, ...[...r.cells.values()].map(c => c.dx)];
+    const ys = [0, r.at.dy, ...[...r.cells.values()].map(c => c.dy)];
+    const x0 = Math.min(...xs) - 1, x1 = Math.max(...xs) + 1;
+    const y0 = Math.min(...ys) - 1, y1 = Math.max(...ys) + 1;
+
     const grid = $('vi-grid');
+    grid.style.gridTemplateColumns = `repeat(${x1 - x0 + 1}, minmax(0, 1fr))`;
     grid.innerHTML = '';
-    for (const row of LAYOUT) {
-      for (const p of row) {
-        const cell = document.createElement('div');
-        cell.className = 'vibuf' + (p === null ? ' blank' : '') + (p === r.at ? ' here' : '') + (p && r.cells[p].changed ? ' changed' : '');
-        if (p) {
-          const head = document.createElement('div');
-          head.className = 'vibuf-head';
-          const keyFor = Object.entries(CELL_KEYS).find(([, v]) => v === p)?.[0];
-          head.textContent = `${p}${keyFor ? `  (${keyFor})` : ''}${r.cells[p].text === null ? '  empty' : ''}`;
-          const body = document.createElement('pre');
-          body.className = 'vibuf-body';
-          body.innerHTML = withCursor(r.cells[p], p === r.at, r.mode);
-          cell.append(head, body);
-        }
-        grid.appendChild(cell);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const id = `${x},${y}`;
+        const cell = r.cells.get(id) ?? { dx: x, dy: y, text: start[id] ?? null, cursor: { line: 0, col: 0 }, changed: false };
+        const here = x === r.at.dx && y === r.at.dy;
+        const el = document.createElement('div');
+        el.className = 'vibuf' + (here ? ' here' : '') + (cell.changed ? ' changed' : '') + (x === 0 && y === 0 ? ' mother' : '');
+        const head = document.createElement('div');
+        head.className = 'vibuf-head';
+        head.textContent = `(${x},${y})${x === 0 && y === 0 ? '  mother' : ''}${cell.text === null ? '  empty' : ''}`;
+        const body = document.createElement('pre');
+        body.className = 'vibuf-body';
+        body.innerHTML = withCursor(cell, here, r.mode);
+        el.append(head, body);
+        grid.appendChild(el);
       }
     }
   }
 
-  // The buffer's text with the cursor drawn in, where the cursor is actually sitting.
+  // The cell's text with the cursor drawn where it is actually sitting.
   function withCursor(cell, active, mode) {
-    const lines = (cell.text ?? '').split('\n');
     const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const lines = (cell.text ?? '').split('\n');
     return lines.map((line, i) => {
       if (!active || i !== cell.cursor.line) return esc(line) || '&nbsp;';
       const c = Math.min(cell.cursor.col, line.length);
-      const cls = mode === 'insert' ? 'cursor insert' : 'cursor';
-      return `${esc(line.slice(0, c))}<span class="${cls}">${esc(line[c] ?? ' ') || '&nbsp;'}</span>${esc(line.slice(c + 1))}`;
+      return `${esc(line.slice(0, c))}<span class="cursor${mode === 'insert' ? ' insert' : ''}">${esc(line[c] ?? ' ') || '&nbsp;'}</span>${esc(line.slice(c + 1))}`;
     }).join('\n') || '&nbsp;';
   }
 
-  function setKeys(next, { step = null } = {}) { keys = next; stepAt = step; render(); }
+  const setKeys = (next, step = null) => { keys = next; stepAt = step; render(); };
 
-  // Typing straight into the bench: the same keys the model would emit, one at a time.
+  // Typing straight into the bench: the same keys the model would emit, one at a time,
+  // spelled the way vim spells them.
   function onKeyDown(e) {
     if (!capturing) return;
-    const map = { Escape: '<Esc>', Enter: '<CR>', Backspace: '<BS>', Tab: '<Tab>' };
-    let k = map[e.key] ?? (e.key.length === 1 ? e.key : null);
+    const named = { Escape: '<Esc>', Enter: '<CR>', Backspace: '<BS>', Tab: '<Tab>' };
+    const k = named[e.key] ?? (e.key.length === 1 ? e.key : null);
     if (k === null) return;
     e.preventDefault();
     setKeys(keys + k);
@@ -114,8 +120,7 @@ export function createViLab() {
       $('vi-keys').addEventListener('input', () => setKeys($('vi-keys').value));
       $('vi-run').addEventListener('click', () => { stepAt = null; render(); });
       $('vi-step').addEventListener('click', () => {
-        const total = tokenize(keys).length;
-        stepAt = stepAt === null ? 1 : Math.min(stepAt + 1, total);
+        stepAt = stepAt === null ? 1 : Math.min(stepAt + 1, tokenize(keys).length);
         render();
       });
       $('vi-back').addEventListener('click', () => { stepAt = Math.max(0, (stepAt ?? tokenize(keys).length) - 1); render(); });
@@ -124,12 +129,16 @@ export function createViLab() {
       $('vi-apply').addEventListener('click', () => {
         // Take the result as the new starting point, the way a turn hands on to the next.
         const r = state();
-        for (const p of PATHS) start[p] = r.cells[p].text;
+        for (const c of r.cells.values()) {
+          if (c.text === null) delete start[`${c.dx},${c.dy}`];
+          else start[`${c.dx},${c.dy}`] = c.text;
+        }
         setKeys('');
       });
       $('vi-capture').addEventListener('change', () => {
         capturing = $('vi-capture').checked;
         $('vi-mode').classList.toggle('capturing', capturing);
+        if (capturing) $('vi-keys').blur();
       });
       window.addEventListener('keydown', onKeyDown);
       render();
