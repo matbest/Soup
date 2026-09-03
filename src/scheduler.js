@@ -1,7 +1,5 @@
 import { coords, occupiedIndices } from './soup.js';
-import { TOOLS, REPLY_SCHEMA, READS, parseReply, runCall, renderResults } from './tools.js';
-
-const SCHEMA = JSON.stringify(REPLY_SCHEMA);
+import { TOOLS, READS, parseReply, runCall, renderResults } from './tools.js';
 
 // Tierra's slicer, minus the reaper. Sweeps every occupied cell once in a random order,
 // one cell per tick, then reshuffles. `opts` is read live so the UI can change it mid-run.
@@ -34,10 +32,8 @@ export function createScheduler(soup, engine, opts) {
         active = i;
         let out;
         try {
-          // The grammar guarantees a well-formed reply; without it a malformed one is a turn
-          // that does nothing, which is also fair. Off by default while WebLLM's grammar
-          // layer misbehaves on some machines.
-          out = await engine.complete({ messages, schema: opts.grammar ? SCHEMA : null, maxTokens: opts.maxTokens, temperature: opts.temperature });
+          // A malformed reply is a turn that does nothing, and was paid for.
+          out = await engine.complete({ messages, maxTokens: opts.maxTokens, temperature: opts.temperature });
         } finally {
           active = null;
         }

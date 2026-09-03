@@ -4,8 +4,8 @@ import { charBudget } from './tokens.js';
 // from jsDelivr so the mock engine never touches the network; weights are fetched from
 // HuggingFace on first load and cached by the browser after that.
 //
-// The slice is enforced natively: max_tokens is the model's own budget, so the model
-// simply stops when it is spent, and a reply cut off mid-object is not a reply.
+// The slice is enforced natively: max_tokens is the model's own budget; a reply cut off
+// mid-object is not a reply.
 const WEBLLM_URL = 'https://esm.run/@mlc-ai/web-llm@0.2.84';
 
 // In order of size. `vram` is WebLLM's own estimate in MB of GPU memory the model needs
@@ -66,31 +66,9 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       try { await engine?.unload(); } catch { /* already gone */ }
       engine = null;
     },
-    async complete({ messages, schema, maxTokens, temperature }) {
-      const request = {
-        response_format: schema ? { type: 'json_object', schema } : undefined,
-        messages,
-        max_tokens: maxTokens,
-        temperature,
-        top_p: 1,
-      };
-      let r;
-      try {
-        if (self.lost) throw new Error(`the GPU device was lost (${self.lost}); reload the page`);
-        r = await engine.chat.completions.create(request);
-      } catch (err) {
-        const msg = err?.message ?? String(err);
-        if (self.lost) throw new Error(`the GPU device was lost (${self.lost}); reload the page`);
-        // "Deleted", "disposed", "already deleted": something WebLLM holds was freed under
-        // it. Short of a device loss (handled above) there is no call to clear it except
-        // reloading the model, so do that (weights are cached) and retry once.
-        if (!/deleted|disposed|GrammarMatcher/i.test(msg)) throw err;
-        console.warn('[soup] engine state was freed under it; reloading the model and retrying', err);
-        onProgress?.('recovering: reloading the model');
-        await engine.reload(modelId);
-        onProgress?.(modelId);
-        r = await engine.chat.completions.create(request);
-      }
+    async complete({ messages, maxTokens, temperature }) {
+      if (self.lost) throw new Error(`the GPU device was lost (${self.lost}); reload the page`);
+      const r = await engine.chat.completions.create({ messages, max_tokens: maxTokens, temperature, top_p: 1 });
       self.lastUsage = r.usage ?? null;
       const text = r.choices?.[0]?.message?.content ?? '';
       // Belt and braces: never return more than the slice, whatever the model says.

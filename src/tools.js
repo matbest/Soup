@@ -1,5 +1,4 @@
-// The toolset, in three forms that must agree: the schema the grammar enforces, the
-// TOOLS text every cell is shown, and the executor that runs a call.
+// The toolset: the TOOLS text every cell is shown, and the executor that runs a call.
 //
 // A cell is a markdown file. Its neighbourhood is five paths: self, north, south, east,
 // west. A turn is a small agent loop: the model replies with calls; reads return results
@@ -12,42 +11,14 @@ import { mutate } from './mutate.js';
 export const PATHS = ['self', 'north', 'south', 'east', 'west'];
 const DIR_OF = { north: 'N', south: 'S', east: 'E', west: 'W' };
 
-const str = { type: 'string' };
-const path = { enum: PATHS };
-const call = (tool, props, required) => ({
-  type: 'object',
-  properties: { tool: { enum: [tool] }, ...props },
-  required: ['tool', ...required],
-  additionalProperties: false,
-});
-
-export const CALL_SCHEMA = {
-  anyOf: [
-    call('list_files', { directory: str }, []),
-    call('read_file', { path }, ['path']),
-    call('copy_file', { src: path, dst: path }, ['src', 'dst']),
-    call('create_file', { path, content: str }, ['path', 'content']),
-    call('replace_text', { path, old_text: str, new_text: str }, ['path', 'old_text', 'new_text']),
-    call('insert_after', { path, anchor: str, text: str }, ['path', 'anchor', 'text']),
-    call('insert_before', { path, anchor: str, text: str }, ['path', 'anchor', 'text']),
-    call('append_text', { path, text: str }, ['path', 'text']),
-    call('delete_file', { path }, ['path']),
-  ],
-};
-
-export const REPLY_SCHEMA = {
-  type: 'object',
-  properties: {
-    thoughts: str,
-    calls: { type: 'array', items: CALL_SCHEMA, minItems: 1 },
-  },
-  required: ['calls'],
-  additionalProperties: false,
-};
+export const TOOL_NAMES = new Set([
+  'list_files', 'read_file', 'copy_file', 'create_file',
+  'replace_text', 'insert_after', 'insert_before', 'append_text', 'delete_file',
+]);
 
 export const READS = new Set(['list_files', 'read_file']);
 
-// Shown after every cell's text, verbatim. Kept beside the schema so they cannot drift.
+// Shown after every cell's text, verbatim.
 export const TOOLS = [
   'TOOLS',
   'Reply with one JSON object: {"thoughts": "...", "calls": [ ... ]}. Thoughts are optional.',
@@ -65,10 +36,8 @@ export const TOOLS = [
   '{"tool":"delete_file","path":P}                              empty P',
 ].join('\n');
 
-const TOOL_NAMES = new Set(CALL_SCHEMA.anyOf.map(c => c.properties.tool.enum[0]));
-
-// Read a reply. Without the grammar the shape is whatever the model felt like, so accept
-// the shapes models actually produce: our own; {"name","arguments"} as they were trained
+// Read a reply. The shape is whatever the model felt like, so accept the shapes models
+// actually produce: our own; {"name","arguments"} as they were trained
 // on; {"read_file": {...}} keyed by tool; "tool" followed by an args object; a bare
 // array. Anything else, or a cut-off reply, is a turn that does nothing.
 export function parseReply(text) {

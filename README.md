@@ -59,10 +59,10 @@ is seen unless read.
     delete_file(path)                    empty it
 
 **Turn.** A small agent loop. The reply is one JSON object: optional `thoughts`, then
-`calls`, at least one. With the `grammar` switch on it is generated under a schema
-(constrained decoding) and cannot be malformed; off, the default, a malformed reply is a
-turn that does nothing, which is also fair, and avoids WebLLM's grammar layer, which fails
-on some machines.
+`calls`, at least one. The parser accepts the shapes models actually produce; a reply it
+cannot read is a turn that does nothing, which is fair, and was paid for. (Constrained
+decoding was tried and removed: WebLLM's grammar layer failed on the author's machine and
+the recovery code only hid the real errors.)
 Calls run in order. Writes take effect at once. If any call was a read, the results go
 back to the model as the next message and it gets another round, up to `rounds` per turn.
 Every round re-sends the growing conversation: reading is paid for in prompt tokens and
