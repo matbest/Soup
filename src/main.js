@@ -573,13 +573,9 @@ async function init() {
   $('load2').addEventListener('click', () => $('loadfile').click());
   $('save-as').addEventListener('click', saveNamed);
   $('log-csv').addEventListener('click', () => {
-    // A row a sweep, in the shape a spreadsheet wants.
     const h = soup.history ?? [];
     if (!h.length) { $('log-note').textContent = 'nothing logged yet'; return; }
-    const head = 'sweep,tick,alive,kinds,len_min,len_median,len_mean,len_max,births,deaths,fail_pct,tokens,window,commonest,commonest_n';
-    const rows = h.map(r => [r.sweep, r.tick, r.alive, r.kinds, r.len.min, r.len.median, r.len.mean, r.len.max,
-      r.births, r.deaths, r.fails, r.spent, r.window ?? '', r.top[0]?.[0] ?? '', r.top[0]?.[1] ?? ''].join(','));
-    const blob = new Blob([[head, ...rows].join('\n')], { type: 'text/csv' });
+    const blob = new Blob([logCsv()], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `soup-log-t${soup.tick}.csv`;
@@ -676,6 +672,15 @@ async function loadAncestor() {
   const file = opts.mode === 'vi' ? (min ? './ancestor-vi-min.md' : './ancestor-vi.md') : './ancestor.md';
   // Normalised, so a seed saved with Windows line endings still parses the same.
   $('ancestor').value = (await (await fetch(file)).text()).replace(/\r\n?/g, '\n').trim();
+}
+
+// A row a sweep, in the shape a spreadsheet wants.
+function logCsv() {
+  const head = 'sweep,tick,alive,kinds,len_min,len_median,len_mean,len_max,births,deaths,fail_pct,tokens,window,commonest,commonest_n';
+  const rows = (soup.history ?? []).map(r => [r.sweep, r.tick, r.alive, r.kinds,
+    r.len.min, r.len.median, r.len.mean, r.len.max, r.births, r.deaths, r.fails, r.spent,
+    r.window ?? '', r.top[0]?.[0] ?? '', r.top[0]?.[1] ?? ''].join(','));
+  return [head, ...rows].join('\n');
 }
 
 // The run as a table: the things Tierra plotted. Newest last, so it reads down like a log.
@@ -776,6 +781,12 @@ async function save(name = 'latest.json', extra = {}) {
   try {
     const r = await fetch(`/save/${name}`, { method: 'POST', body: JSON.stringify({ ...dump(), ...extra }, null, 2) });
     if (!r.ok) throw new Error(`${r.status}`);
+    // The same history as a spreadsheet, beside the soup it came from, so there is always
+    // a plottable file on disk without anyone having to press anything.
+    if (soup.history?.length) {
+      const csv = name === 'latest.json' ? 'log.csv' : name.replace(/\.json$/, '') + '.csv';
+      await fetch(`/save/${csv}`, { method: 'POST', body: logCsv() }).catch(() => {});
+    }
   } catch {
     saveBroken = true;
     console.info('[soup] no save endpoint; run `python serve.py` to keep runs on disk');

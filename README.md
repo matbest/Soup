@@ -399,8 +399,10 @@ famous plot can be read at a glance.
 At the close of every sweep a row is written: how many cells are alive, how many kinds
 there are, the shortest, median and longest genome, how many were born and how many were
 written over, the failure rate, the tokens spent, the prompt window, and the commonest
-genotype with its count. The population tab shows the last forty rows and will download
-the lot as a CSV. The whole history travels inside a saved soup, so a run can be picked
+genotype with its count. Every save writes the log as a spreadsheet beside the soup: `runs/log.csv` for the
+automatic one, `runs/<name>.csv` for a named soup. So there is always a plottable file on
+disk without anyone pressing anything. The population tab shows the last forty rows and
+will download a copy too. The whole history travels inside a saved soup, so a run can be picked
 apart afterwards.
 
 Those are the numbers Tierra was read through — size over time above all, since the

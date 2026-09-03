@@ -50,8 +50,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_error(404, 'only /save/<name> accepts POST')
             return
         name = self.path[len('/save/'):]
-        if not SAFE_NAME.match(name) or not name.endswith(('.json', '.jsonl', '.txt')):
-            self.send_error(400, 'name must be a simple .json, .jsonl or .txt filename')
+        if not SAFE_NAME.match(name) or not name.endswith(('.json', '.jsonl', '.txt', '.csv')):
+            self.send_error(400, 'name must be a simple .json, .jsonl, .txt or .csv filename')
             return
         try:
             length = int(self.headers.get('Content-Length') or 0)
