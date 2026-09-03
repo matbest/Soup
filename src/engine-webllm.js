@@ -49,9 +49,11 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       captureGpuErrors(reason => { if (!self.lost) { self.lost = reason; onProgress?.(`GPU error: ${reason}`); } });
       const webllm = await import(WEBLLM_URL);
       try {
+        // Prompts here are a few hundred tokens; the models ship with 32k windows. A small
+        // window keeps the KV cache, and every attention dispatch, small.
         engine = await webllm.CreateMLCEngine(modelId, {
           initProgressCallback: p => onProgress?.(p.text),
-        });
+        }, { context_window_size: 4096 });
       } catch (err) {
         // The browser's GPU process can drop its WebGPU device; a full restart of the
         // browser brings it back. Say so, instead of WebLLM's paragraph about compatibility.
@@ -71,12 +73,13 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       engine = null;
     },
     async complete({ messages, maxTokens, temperature }) {
-      if (self.lost) throw new Error(`the GPU gave up: ${self.lost}. Reload the page; if it recurs, try a smaller model.`);
+      const gaveUp = () => new Error(`${self.lost} Reload the page. If it recurs: update the GPU driver, try a smaller model, or raise the watchdog limit (TdrDelay).`);
+      if (self.lost) throw gaveUp();
       let r;
       try {
         r = await engine.chat.completions.create({ messages, max_tokens: maxTokens, temperature, top_p: 1 });
       } catch (err) {
-        if (self.lost) throw new Error(`the GPU gave up: ${self.lost}. Reload the page; if it recurs, try a smaller model.`);
+        if (self.lost) throw gaveUp();
         throw err;
       }
       self.lastUsage = r.usage ?? null;
@@ -101,8 +104,8 @@ function captureGpuErrors(onError) {
       const name = a?.constructor?.name ?? '';
       if (/^GPU(OutOfMemory|Validation|Internal)?Error$/.test(name) || /GPUDeviceLostInfo/.test(name)) {
         onError(`${name.replace(/^GPU|Error$/g, '') || 'device lost'}: ${a.message ?? a.reason ?? ''}`.trim());
-      } else if (typeof a === 'string' && /device lost/i.test(a)) {
-        onError(a.replace(/\s+/g, ' ').slice(0, 160));
+      } else if (typeof a === 'string' && /device (was )?lost/i.test(a)) {
+        onError('the GPU device was lost. On Windows this is usually the GPU watchdog (TDR) resetting the card because a dispatch ran over its 2-second limit: DXGI_ERROR_DEVICE_HUNG in the console.');
       }
     }
   };
