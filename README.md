@@ -240,8 +240,14 @@ Because the cell is everything, the key reference lives in the cell too. The see
 it, and only then explains what the keys do and what is going on — a model's reply tends
 to mirror the shape of what it was given, so the payload goes first and the prose after.
 An earlier version led with a table of keys, and a 1B model answered by narrating the
-table one key at a time until it ran out of tokens, never reaching the instruction. That
-makes the reference heritable and mutable like the rest: a lineage that keeps a good
+table one key at a time until it ran out of tokens, never reaching the instruction.
+
+The keys are written spread out — `gg yG   L   gg VG p` — because spaces and line breaks
+are no-ops in normal mode, and ten dense characters are hard for a small model to copy
+exactly: asked for `ggyGLggVGp`, Llama-3.2-1B returned `ggyGggggVp` and pasted over
+itself. Spacing costs nothing and every spelling of it runs the same program, which gives
+the genome a wide neutral network: many mutations change the text without changing what it
+does. That makes the reference heritable and mutable like the rest: a lineage that keeps a good
 reference reproduces, one that loses it drifts. That is the whole experiment. A cell's
 text is not data the model reads about, it is the thing that has to induce a working
 program.
