@@ -150,7 +150,7 @@ function normalise(list) {
 
 // Run one call from the cell at (x, y). Returns { ok, output, effect? }; `effect` is the
 // write that happened, for the log and the view.
-export function runCall(soup, x, y, c, { noise = 0 } = {}) {
+export function runCall(soup, x, y, c, { noise = 0, readLimit = 600 } = {}) {
   const source = at(soup, x, y);
   const resolve = p => (p === 'self' ? [x, y] : neighbourCoords(soup, x, y, DIR_OF[p]));
   const argPath = p => (PATHS.includes(p) ? p : null);
@@ -169,7 +169,12 @@ export function runCall(soup, x, y, c, { noise = 0 } = {}) {
     case 'read_file': {
       const p = argPath(c.path); if (!p) return fail('no such path');
       const cell = at(soup, ...resolve(p));
-      return cell.md === null ? fail(`${p} is empty`) : okay(cell.md);
+      if (cell.md === null) return fail(`${p} is empty`);
+      // A read is capped. Prefill is one GPU dispatch and its cost scales with what is in
+      // the prompt, so an unbounded read is an unbounded dispatch.
+      return okay(cell.md.length > readLimit
+        ? `${cell.md.slice(0, readLimit)}\n… (${cell.md.length - readLimit} more bytes not shown)`
+        : cell.md);
     }
     case 'copy_file': {
       const src = argPath(c.src), dst = argPath(c.dst);

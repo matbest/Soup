@@ -75,8 +75,23 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       try { await engine?.unload(); } catch { /* already gone */ }
       engine = null;
     },
+    // A watchdog reset disposes everything the runtime holds, and there is no way back
+    // through the old objects. Build a whole new engine on the same (still present)
+    // adapter instead, so one reset costs a model load rather than the run.
+    async recover() {
+      engine = null;
+      self.lost = null;
+      const webllm = await import(WEBLLM_URL);
+      engine = await webllm.CreateMLCEngine(modelId, {
+        initProgressCallback: p => onProgress?.(`recovering: ${p.text}`),
+      }, { context_window_size: 4096 });
+    },
     async complete({ messages, schema, maxTokens, temperature }) {
-      const gaveUp = () => new Error(`${self.lost} Reload the page. If it recurs: update the GPU driver, try a smaller model, or raise the watchdog limit (TdrDelay).`);
+      const gaveUp = () => {
+        const e = new Error(`${self.lost} If it recurs: update the GPU driver, try a smaller model, or raise the watchdog limit (TdrDelay).`);
+        e.deviceLost = true;
+        return e;
+      };
       if (self.lost) throw gaveUp();
       let r;
       try {

@@ -8,7 +8,7 @@ import { estimateTokens } from './tokens.js';
 
 const $ = id => document.getElementById(id);
 
-const opts = { maxTokens: 300, temperature: 0.7, noise: 0, rounds: 4, grammar: true, ticksPerFrame: 20 };
+const opts = { maxTokens: 300, temperature: 0.7, noise: 0, rounds: 4, grammar: true, budget: 1200, readLimit: 600, ticksPerFrame: 20 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -158,6 +158,9 @@ async function loop() {
       try {
         ev = await inFlight.finally(() => { inFlight = null; });
       } catch (err) {
+        // A GPU reset need not end the run: rebuild the engine and keep going. The soup
+        // itself is untouched, only the model's device state died.
+        if (err?.deviceLost && await recoverEngine()) continue;
         running = false;
         failed(err);
         break;
@@ -170,6 +173,26 @@ async function loop() {
     await yieldToBrowser();
   }
   $('run').textContent = 'Run';
+}
+
+let recoveries = 0;
+
+async function recoverEngine() {
+  if (!engine.recover || recoveries >= 5) return false;
+  recoveries++;
+  $('status').textContent = `GPU was reset; rebuilding the model (${recoveries})`;
+  console.warn('[soup] GPU was reset; rebuilding the model', recoveries);
+  setBusy(true);
+  try {
+    await engine.recover();
+    $('status').textContent = `${engine.name} on ${engine.gpu}  (recovered ${recoveries}x)`;
+    return true;
+  } catch (err) {
+    failed(err);
+    return false;
+  } finally {
+    setBusy(false);
+  }
 }
 
 // A turn that throws (the engine, the grammar, the GPU) must say so on the page, not
@@ -231,6 +254,7 @@ async function init() {
   bind('slice', 'maxTokens');
   bind('noise', 'noise');
   bind('rounds', 'rounds');
+  bind('budget', 'budget');
   $('grammar').checked = opts.grammar;
   $('grammar').addEventListener('change', () => { opts.grammar = $('grammar').checked; });
   bind('tpf', 'ticksPerFrame');

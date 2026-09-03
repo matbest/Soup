@@ -107,6 +107,21 @@ on a 4 GB laptop card those two constraints nearly meet.
   models; nothing in this repo can work around it.
 - **SmolLM2-360M and below** never trip it, and write Python instead of tool calls.
 
+A turn's cost is not fixed, which is why an hour of clean running can still end in a
+reset: each round appends the model's reply and the tool results to the conversation, and
+a read returns a neighbour's text. So a turn that reads two grown documents prefills
+several times what a plain one does. Two limits keep that bounded, and both are prices
+rather than rules:
+
+- **read cap** — a read returns at most 600 characters, then says how many it withheld.
+- **turn budget** — the slice covers the whole turn, prompt included. A conversation that
+  has grown past it ends the turn: a cell that spent its slice looking around has spent
+  its slice.
+
+And a reset is no longer fatal. The runtime cannot be revived, so the page builds a whole
+new engine on the same adapter and the run continues, up to five times. The soup itself is
+never touched by a reset; only the model's device state dies.
+
 Hence two switches that look like fussiness and are not:
 
 - **Short TOOLS** (`?tools=full` for the verbose one) halves the prompt, which roughly
