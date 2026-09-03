@@ -58,8 +58,11 @@ is seen unless read.
     append_text(path, text)              a line at the end; creates the file if empty
     delete_file(path)                    empty it
 
-**Turn.** A small agent loop. The reply is one JSON object under a schema (constrained
-decoding, so it cannot be malformed): optional `thoughts`, then `calls`, at least one.
+**Turn.** A small agent loop. The reply is one JSON object: optional `thoughts`, then
+`calls`, at least one. With the `grammar` switch on it is generated under a schema
+(constrained decoding) and cannot be malformed; off, the default, a malformed reply is a
+turn that does nothing, which is also fair, and avoids WebLLM's grammar layer, which fails
+on some machines.
 Calls run in order. Writes take effect at once. If any call was a read, the results go
 back to the model as the next message and it gets another round, up to `rounds` per turn.
 Every round re-sends the growing conversation: reading is paid for in prompt tokens and

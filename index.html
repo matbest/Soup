@@ -24,6 +24,7 @@
   legend { padding: 0 4px; color: #8fa39b; }
   label { display: grid; grid-template-columns: 72px 1fr 40px; align-items: center; gap: 6px; margin: 4px 0; }
   input[type=range] { width: 100%; height: 10px; }
+  input[type=checkbox] { justify-self: start; margin: 0; }
   select, button { font: inherit; background: #15181b; color: inherit; border: 1px solid #2d3136; padding: 3px 6px; }
   button { cursor: pointer; }
   button:hover { border-color: #6b8f84; }
@@ -72,6 +73,7 @@
         <label>slice (tokens) <input id="slice" type="range" min="10" max="800" step="10" value="300"><span id="slice-v"></span></label>
         <label>copy noise <input id="noise" type="range" min="0" max="0.02" step="0.0005" value="0"><span id="noise-v"></span></label>
         <label>rounds/turn <input id="rounds" type="range" min="1" max="6" value="4"><span id="rounds-v"></span></label>
+        <label>grammar <input id="grammar" type="checkbox"><span title="Constrained decoding: replies are guaranteed valid JSON. Off, a malformed reply is a turn that does nothing.">off = tolerant</span></label>
       </fieldset>
       <fieldset>
         <legend>soup</legend>

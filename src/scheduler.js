@@ -34,7 +34,10 @@ export function createScheduler(soup, engine, opts) {
         active = i;
         let out;
         try {
-          out = await engine.complete({ messages, schema: SCHEMA, maxTokens: opts.maxTokens, temperature: opts.temperature });
+          // The grammar guarantees a well-formed reply; without it a malformed one is a turn
+          // that does nothing, which is also fair. Off by default while WebLLM's grammar
+          // layer misbehaves on some machines.
+          out = await engine.complete({ messages, schema: opts.grammar ? SCHEMA : null, maxTokens: opts.maxTokens, temperature: opts.temperature });
         } finally {
           active = null;
         }

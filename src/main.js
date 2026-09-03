@@ -8,7 +8,7 @@ import { estimateTokens } from './tokens.js';
 
 const $ = id => document.getElementById(id);
 
-const opts = { maxTokens: 300, temperature: 0.7, noise: 0, rounds: 4, ticksPerFrame: 20 };
+const opts = { maxTokens: 300, temperature: 0.7, noise: 0, rounds: 4, grammar: false, ticksPerFrame: 20 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -221,6 +221,8 @@ async function init() {
   bind('slice', 'maxTokens');
   bind('noise', 'noise');
   bind('rounds', 'rounds');
+  $('grammar').addEventListener('change', () => { opts.grammar = $('grammar').checked; });
+  opts.grammar = $('grammar').checked;
   bind('tpf', 'ticksPerFrame');
   engine = await makeEngine($('engine').value);
   reset();
