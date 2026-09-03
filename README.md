@@ -180,8 +180,8 @@ Hence two switches that look like fussiness and are not:
   tier is rate limited so the soup runs at the API's pace, and a cell's text leaves the
   machine. The key is the visitor's own, kept in their browser's localStorage; there is
   none in this repo and a published copy must ask each visitor for theirs.
-  A long run has to pace itself: the **requests/min** dial sets the floor between calls,
-  and in vi mode a turn is one request, so it is turns per minute. Every refusal widens
+  A long run has to pace itself: the **calls/min** dial sets the floor between calls,
+  and in vi mode a turn is one call, so it is also turns per minute. It starts at 10. Every refusal widens
   that gap by half again and each success narrows it, so a run finds the pace the service
   will accept rather than being cut off. `Retry-After` is honoured. Running out of the
   day's free allowance pauses the run and saves it rather than failing, so it can be

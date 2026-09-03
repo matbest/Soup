@@ -60,7 +60,7 @@ function detail(body) {
   }
 }
 
-export function createOpenRouterEngine(modelId, { onProgress, getRpm = () => 15 } = {}) {
+export function createOpenRouterEngine(modelId, { onProgress, getRpm = () => 10 } = {}) {
   let supportsSchema = false;
   let nextAllowedAt = 0;
   let backoff = 1;        // grows when the service says no, shrinks when it stops saying it
@@ -185,7 +185,7 @@ export function createOpenRouterEngine(modelId, { onProgress, getRpm = () => 15 
   // floor is whatever the requests-per-minute dial says, widened by any backoff the
   // service has taught us.
   async function pace() {
-    const rpm = Math.max(1, getRpm() || 15);
+    const rpm = Math.max(1, getRpm() || 10);
     const floor = (60000 / rpm) * backoff;
     const wait = nextAllowedAt - Date.now();
     if (wait > 0) {

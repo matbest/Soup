@@ -14,7 +14,7 @@ const $ = id => document.getElementById(id);
 
 // Copy noise is the mutation rate, and at zero there is no evolution: every copy is
 // exact, so nothing varies and nothing can be selected. It is on by default.
-const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, rpm: 12, steps: 1 };
+const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, allowance: 0, rpm: 10, steps: 1 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
