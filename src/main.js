@@ -149,7 +149,15 @@ function firstLine(md) {
 }
 
 function usageText(u) {
-  return u ? `  (${u.prompt_tokens} in, ${u.completion_tokens} out)` : '';
+  if (!u) return '';
+  // WebLLM reports how long the work actually took. Prefill is one dispatch, and on
+  // Windows a dispatch over two seconds gets the card reset, so this is the number that
+  // says whether a local model is safe on this machine.
+  const e = u.extra;
+  const timing = e
+    ? `  ${e.time_to_first_token_s?.toFixed(2)}s to first token, prefill ${Math.round(e.prefill_tokens_per_s ?? 0)}/s, decode ${Math.round(e.decode_tokens_per_s ?? 0)}/s`
+    : '';
+  return `  (${u.prompt_tokens} in, ${u.completion_tokens} out)${timing}`;
 }
 
 // One line for what a turn did: its writes, and what it cost.
