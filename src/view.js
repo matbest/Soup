@@ -13,21 +13,31 @@ export function createView(canvas, getSoup, { onSelect, onHover = () => {}, getA
     return `hsl(${h % 360} ${35 + ((h >>> 9) % 20)}% ${70 + ((h >>> 14) % 12)}%)`;
   }
 
+  // Where the cells fall. Pure: hit-testing a pointer must never touch the canvas, because
+  // assigning canvas.width clears it and only draw() puts anything back.
   function layout() {
     const soup = getSoup();
-    const dpr = window.devicePixelRatio || 1;
     const side = Math.max(1, Math.floor(Math.min(canvas.clientWidth, canvas.clientHeight)));
-    if (canvas.width !== side * dpr || canvas.height !== side * dpr) {
-      canvas.width = side * dpr;
-      canvas.height = side * dpr;
-    }
     const cell = Math.floor(side / Math.max(soup.w, soup.h));
-    return { dpr, side, cell, ox: Math.floor((side - cell * soup.w) / 2), oy: Math.floor((side - cell * soup.h) / 2) };
+    return { side, cell, ox: Math.floor((side - cell * soup.w) / 2), oy: Math.floor((side - cell * soup.h) / 2) };
+  }
+
+  // Rounded to whole device pixels, or a fractional display scale leaves the comparison
+  // permanently unequal and the canvas is cleared on every call.
+  function resize(side) {
+    const dpr = window.devicePixelRatio || 1;
+    const px = Math.round(side * dpr);
+    if (canvas.width !== px || canvas.height !== px) {
+      canvas.width = px;
+      canvas.height = px;
+    }
+    return dpr;
   }
 
   function draw() {
     const soup = getSoup();
-    const { dpr, side, cell, ox, oy } = layout();
+    const { side, cell, ox, oy } = layout();
+    const dpr = resize(side);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#0a0b0c';
     ctx.fillRect(0, 0, side, side);
