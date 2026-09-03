@@ -2,7 +2,7 @@ import { createSoup, place, stats, snapshot, coords } from './soup.js';
 import { createScheduler, prompt } from './scheduler.js';
 import { MANUAL } from './actions.js';
 import { createMockEngine } from './engine-mock.js';
-import { createWebLLMEngine, MODELS, describeAdapter } from './engine-webllm.js';
+import { createWebLLMEngine, MODELS, DEFAULT_MODEL, describeAdapter } from './engine-webllm.js';
 import { createView } from './view.js';
 import { estimateTokens } from './tokens.js';
 
@@ -194,12 +194,14 @@ function bind(id, key) {
 }
 
 async function init() {
+  const mock = $('engine').querySelector('option[value=mock]');
   for (const m of MODELS) {
     const o = document.createElement('option');
     o.value = m.id;
     o.textContent = `${m.id.replace(/-(Instruct-)?q\w+-MLC$/, '')}  ~${(m.vram / 1024).toFixed(1)} GB`;
-    $('engine').appendChild(o);
+    $('engine').insertBefore(o, mock);
   }
+  $('engine').value = DEFAULT_MODEL;
   $('ancestor').value = (await (await fetch('./ancestor.json')).text()).trim();
   $('manual').textContent = MANUAL;
   for (const b of document.querySelectorAll('nav [role=tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));

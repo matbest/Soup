@@ -27,6 +27,9 @@ export const MODELS = [
 
 export const vramOf = id => MODELS.find(m => m.id === id)?.vram;
 
+// The smallest model that reads its document rather than guessing at it.
+export const DEFAULT_MODEL = 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
+
 export function createWebLLMEngine(modelId, { onProgress } = {}) {
   let engine = null;
   const self = {
