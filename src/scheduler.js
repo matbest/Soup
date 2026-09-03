@@ -60,7 +60,7 @@ export function createScheduler(soup, engine, opts) {
         if (u) { ev.usage.prompt_tokens += u.prompt_tokens ?? 0; ev.usage.completion_tokens += u.completion_tokens ?? 0; }
         const { thoughts, calls } = parseReply(out);
         const results = calls.map(c => runCall(soup, x, y, c, { noise: opts.noise, readLimit: opts.readLimit }));
-        ev.rounds.push({ out, thoughts, calls, results });
+        ev.rounds.push({ out, thoughts, calls, results, finish: engine.lastFinish ?? null, reasoning: engine.lastReasoning || '' });
         for (const res of results) if (res.effect) ev.effects.push(res.effect);
         if (!calls.some(c => READS.has(c.tool))) break;
         repeated = ev.rounds.length > 1 && sameCalls(calls, ev.rounds[ev.rounds.length - 2].calls);

@@ -41,6 +41,11 @@ export async function freeModels() {
 
 // OpenRouter puts the useful part in a JSON error body; pass it on rather than replacing
 // it with a guess.
+function safeArgs(a) {
+  if (a && typeof a === 'object') return a;
+  try { return JSON.parse(a ?? '{}'); } catch { return {}; }
+}
+
 function detail(body) {
   try {
     const e = JSON.parse(body).error;
@@ -59,6 +64,8 @@ export function createOpenRouterEngine(modelId, { onProgress, minIntervalMs = 35
     name: modelId,
     instant: false,
     lastUsage: null,
+    lastFinish: null,
+    lastReasoning: '',
     gpu: 'openrouter',
     lost: null,
 
@@ -125,11 +132,22 @@ export function createOpenRouterEngine(modelId, { onProgress, minIntervalMs = 35
         if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${detail(await r.text())}`);
 
         const json = await r.json();
-        if (json.error) throw new Error(`OpenRouter: ${String(json.error.message ?? json.error).slice(0, 160)}`);
+        if (json.error) throw new Error(`OpenRouter: ${detail(JSON.stringify(json))}`);
         self.lastUsage = json.usage
           ? { prompt_tokens: json.usage.prompt_tokens ?? 0, completion_tokens: json.usage.completion_tokens ?? 0 }
           : null;
-        return json.choices?.[0]?.message?.content ?? '';
+        const choice = json.choices?.[0] ?? {};
+        const msg = choice.message ?? {};
+        // Why a turn did nothing matters as much as that it did. A reasoning model can
+        // spend the whole slice thinking and return an empty content with its thoughts in
+        // `reasoning`; a native tool call arrives beside the content rather than in it.
+        self.lastFinish = choice.finish_reason ?? choice.native_finish_reason ?? null;
+        self.lastReasoning = typeof msg.reasoning === 'string' ? msg.reasoning : '';
+        if (msg.content) return msg.content;
+        if (Array.isArray(msg.tool_calls) && msg.tool_calls.length) {
+          return JSON.stringify({ calls: msg.tool_calls.map(t => ({ tool: t.function?.name, ...safeArgs(t.function?.arguments) })) });
+        }
+        return self.lastReasoning || '';
       }
     },
   };
