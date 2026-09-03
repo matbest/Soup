@@ -15,6 +15,7 @@ export function createMockEngine({ rng = Math.random, chatter = 0.02 } = {}) {
     gpu: null,
     async load() {},
     async unload() {},
+    async reset() {},
     async complete({ messages, maxTokens }) {
       let reply;
       if (messages.length <= 2) {

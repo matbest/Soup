@@ -30,6 +30,9 @@ export function createScheduler(soup, engine, opts) {
     }
     const cell = soup.cells[i];
     const [x, y] = coords(soup, i);
+    // Every turn starts in a fresh environment: the cell's own text and the tools, with
+    // nothing inherited from whichever cell ran last.
+    await engine.reset?.();
     const messages = prompt(cell.md);
     const ev = { tick: 0, x, y, rounds: [], effects: [], usage: { prompt_tokens: 0, completion_tokens: 0 } };
     const last = Math.max(1, opts.rounds) - 1;
@@ -41,10 +44,11 @@ export function createScheduler(soup, engine, opts) {
         // The last round, or one that just repeated itself, cannot read: small models will
         // otherwise list the files over and over and never act.
         const writeOnly = r === last || repeated;
-        // The turn's budget covers what it reads as well as what it says. A conversation
-        // that has grown past it is a turn that has spent its slice looking around.
+        // The turn's budget covers everything the turn costs: the cell's own text, what it
+        // reads, and what it says. A cell too long to afford its own prompt cannot act at
+        // all, and so cannot reproduce: length is priced, and past a point it is lethal.
         const promptTokens = messages.reduce((n, m) => n + estimateTokens(m.content), 0);
-        if (r > 0 && promptTokens + opts.maxTokens > opts.budget) { ev.overBudget = true; break; }
+        if (promptTokens + opts.maxTokens > opts.budget) { ev.overBudget = true; break; }
         try {
           // Under the grammar the reply cannot be malformed. Without it, a reply the parser
           // cannot read is a turn that does nothing, and was paid for.

@@ -107,16 +107,22 @@ on a 4 GB laptop card those two constraints nearly meet.
   models; nothing in this repo can work around it.
 - **SmolLM2-360M and below** never trip it, and write Python instead of tool calls.
 
-A turn's cost is not fixed, which is why an hour of clean running can still end in a
+Every turn starts in a fresh environment. The engine's conversation and KV cache are
+dropped before a cell runs, so a turn depends on that cell's text and nothing else: no
+inheritance from whichever cell happened to run before it, and nothing that accumulates
+over an hour.
+
+A turn's cost is still not fixed, which is why an hour of clean running can end in a
 reset: each round appends the model's reply and the tool results to the conversation, and
 a read returns a neighbour's text. So a turn that reads two grown documents prefills
 several times what a plain one does. Two limits keep that bounded, and both are prices
 rather than rules:
 
 - **read cap** — a read returns at most 600 characters, then says how many it withheld.
-- **turn budget** — the slice covers the whole turn, prompt included. A conversation that
-  has grown past it ends the turn: a cell that spent its slice looking around has spent
-  its slice.
+- **turn budget** — the slice covers everything a turn costs: the cell's own text, what
+  it reads, and what it says. A conversation grown past it ends the turn, and a cell too
+  long to afford its own prompt cannot act at all, so it cannot reproduce. Length is
+  priced, and past a point it is lethal.
 
 And a reset is no longer fatal. The runtime cannot be revived, so the page builds a whole
 new engine on the same adapter and the run continues, up to five times. The soup itself is

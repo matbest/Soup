@@ -86,6 +86,12 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
         initProgressCallback: p => onProgress?.(`recovering: ${p.text}`),
       }, { context_window_size: 4096 });
     },
+    // Start a turn from nothing: drop the conversation and the KV cache the last cell
+    // left behind. WebLLM would reset anyway when it sees a different conversation, but
+    // a cell's turn should not depend on that noticing.
+    async reset() {
+      try { await engine?.resetChat(); } catch { /* nothing to reset */ }
+    },
     async complete({ messages, schema, maxTokens, temperature }) {
       const gaveUp = () => {
         const e = new Error(`${self.lost} If it recurs: update the GPU driver, try a smaller model, or raise the watchdog limit (TdrDelay).`);
