@@ -4,7 +4,7 @@ import * as toolset from './tools.js';
 const { setTools } = toolset;
 import { createMockEngine } from './engine-mock.js';
 import { createWebLLMEngine, MODELS, DEFAULT_MODEL, describeAdapter } from './engine-webllm.js';
-import { createOpenRouterEngine, freeModels, storedKey, storeKey, PREFIX } from './engine-openrouter.js';
+import { createOpenRouterEngine, freeModels, storedKey, storeKey, PREFIX, PREFERRED } from './engine-openrouter.js';
 import { createView } from './view.js';
 import { createViLab } from './vi-lab.js';
 import { viPrompt } from './vi-soup.js';
@@ -408,7 +408,11 @@ async function loadFreeModels() {
       o.textContent = `${m.id}${m.schema ? '  (schema)' : ''}`;
       group.appendChild(o);
     }
-    $('or-note').textContent = `${models.length} free models, ${models.filter(m => m.schema).length} that can be held to the schema`;
+    const preferred = models.find(m => m.id === PREFERRED);
+    if (preferred) $('engine').value = PREFIX + PREFERRED;
+    $('or-note').textContent =
+      `${models.length} free models, ${models.filter(m => m.schema).length} that can be held to the schema` +
+      (preferred ? `. ${PREFERRED} selected` : '');
   } catch (err) {
     $('or-note').textContent = err.message;
   }

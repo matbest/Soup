@@ -15,6 +15,10 @@ const BASE = 'https://openrouter.ai/api/v1';
 const KEY_STORE = 'soup.openrouter.key';
 export const PREFIX = 'or:';
 
+// A code model is the right shape for an instruction set made of keystrokes, and this one
+// is free with a long context. Preselected when the free list loads, if it is still there.
+export const PREFERRED = 'cohere/north-mini-code:free';
+
 export const storedKey = () => {
   try { return localStorage.getItem(KEY_STORE) || ''; } catch { return ''; }
 };

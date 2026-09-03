@@ -164,6 +164,9 @@ Hence two switches that look like fussiness and are not:
   tier is rate limited so the soup runs at the API's pace, and a cell's text leaves the
   machine. The key is the visitor's own, kept in their browser's localStorage; there is
   none in this repo and a published copy must ask each visitor for theirs.
+  `cohere/north-mini-code:free` is preselected when the free list loads: a code model is
+  the right shape for an instruction set made of keystrokes, and it is free with a long
+  context.
 - `webllm`: a small instruct model over WebGPU, loaded in the page and cached by the
   browser. Qwen2.5-0.5B is the working floor; the status line shows which GPU it got.
 
