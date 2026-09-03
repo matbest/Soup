@@ -1,5 +1,6 @@
 import { coords, occupiedIndices } from './soup.js';
-import { TOOLS, READS, parseReply, runCall, renderResults } from './tools.js';
+import * as tools from './tools.js';
+const { READS, parseReply, runCall, renderResults } = tools;
 
 // Tierra's slicer, minus the reaper. Sweeps every occupied cell once in a random order,
 // one cell per tick, then reshuffles. `opts` is read live so the UI can change it mid-run.
@@ -65,7 +66,7 @@ export function createScheduler(soup, engine, opts) {
 export function prompt(md) {
   return [
     { role: 'system', content: '' },
-    { role: 'user', content: `${md}\n\n${TOOLS}` },
+    { role: 'user', content: `${md}\n\n${tools.TOOLS}` },
   ];
 }
 

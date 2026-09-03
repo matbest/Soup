@@ -18,8 +18,11 @@ export const TOOL_NAMES = new Set([
 
 export const READS = new Set(['list_files', 'read_file']);
 
-// Shown after every cell's text, verbatim.
-export const TOOLS = [
+// Shown after every cell's text, verbatim. Two sizes, because prefill is one GPU dispatch
+// and its cost scales with prompt length: on a small card a long prompt can run past the
+// Windows watchdog limit and get the device reset. `short` is the same nine tools in a
+// third of the tokens.
+export const TOOLS_FULL = [
   'TOOLS',
   'Reply with one JSON object: {"thoughts": "...", "calls": [ ... ]}. Thoughts are optional.',
   'Each call names a tool and its arguments. Reads return results and you get another round',
@@ -36,6 +39,26 @@ export const TOOLS = [
   '{"tool":"append_text","path":"south","text":"..."}                 add a line at the end of a file',
   '{"tool":"delete_file","path":"east"}                               empty a file',
 ].join('\n');
+
+export const TOOLS_SHORT = [
+  'TOOLS. Files: self north south east west. Reply {"calls":[...]}.',
+  '{"tool":"list_files","directory":"."}',
+  '{"tool":"read_file","path":"north"}',
+  '{"tool":"copy_file","src":"self","dst":"east"}   (reproduce)',
+  '{"tool":"create_file","path":"west","content":"..."}',
+  '{"tool":"replace_text","path":"self","old_text":"...","new_text":"..."}',
+  '{"tool":"insert_after","path":"north","anchor":"...","text":"..."}',
+  '{"tool":"insert_before","path":"north","anchor":"...","text":"..."}',
+  '{"tool":"append_text","path":"south","text":"..."}',
+  '{"tool":"delete_file","path":"east"}',
+].join('\n');
+
+export let TOOLS = TOOLS_FULL;
+
+export function setTools(which) {
+  TOOLS = which === 'short' ? TOOLS_SHORT : TOOLS_FULL;
+  return TOOLS;
+}
 
 // Read a reply. The shape is whatever the model felt like, so accept the shapes models
 // actually produce: our own; {"name","arguments"} as they were trained
