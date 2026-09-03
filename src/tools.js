@@ -46,9 +46,13 @@ export const CALL_SCHEMA = {
   ],
 };
 
+// Exactly one call per round. Shown a list of nine tools, a small model will emit all
+// nine in order: it is completing the pattern of the manual rather than choosing, and in
+// testing that made a copy and then deleted it. A round is one decision; a turn still
+// gets several rounds.
 const reply = items => ({
   type: 'object',
-  properties: { thoughts: str, calls: { type: 'array', items, minItems: 1 } },
+  properties: { thoughts: str, calls: { type: 'array', items, minItems: 1, maxItems: 1 } },
   required: ['calls'],
   additionalProperties: false,
 });
@@ -68,7 +72,7 @@ export const WRITE_SCHEMA = reply({
 // third of the tokens, and is the default.
 export const TOOLS_FULL = [
   'TOOLS',
-  'Reply with one JSON object: {"thoughts": "...", "calls": [ ... ]}. Thoughts are optional.',
+  'Reply with one JSON object: {"thoughts": <optional>, "calls": [ one call ]}. One call per reply.',
   'Each call names a tool and its arguments. Reads return results and you get another round',
   'to act on them; writes take effect at once.',
   'There are exactly five files, named self, north, south, east, west. There are no others.',
@@ -76,24 +80,24 @@ export const TOOLS_FULL = [
   '{"tool":"list_files","directory":"."}                              which of the five files exist, and their sizes',
   '{"tool":"read_file","path":"north"}                                the contents of a file',
   '{"tool":"copy_file","src":"self","dst":"east"}                     copy a file over another; a copy is how you reproduce',
-  '{"tool":"create_file","path":"west","content":"..."}               write a new file over one of the five',
-  '{"tool":"replace_text","path":"self","old_text":"...","new_text":"..."}   replace the first occurrence',
-  '{"tool":"insert_after","path":"north","anchor":"...","text":"..."}       insert a line after the line containing anchor',
-  '{"tool":"insert_before","path":"north","anchor":"...","text":"..."}      insert a line before it',
-  '{"tool":"append_text","path":"south","text":"..."}                 add a line at the end of a file',
+  '{"tool":"create_file","path":"west","content":<the text>}          write a new file over one of the five',
+  '{"tool":"replace_text","path":"self","old_text":<find>,"new_text":<replace>}   replace the first occurrence',
+  '{"tool":"insert_after","path":"north","anchor":<find>,"text":<the line>}     insert a line after the line containing anchor',
+  '{"tool":"insert_before","path":"north","anchor":<find>,"text":<the line>}    insert a line before it',
+  '{"tool":"append_text","path":"south","text":<the line>}            add a line at the end of a file',
   '{"tool":"delete_file","path":"east"}                               empty a file',
 ].join('\n');
 
 export const TOOLS_SHORT = [
-  'TOOLS. Files: self north south east west. Reply {"calls":[...]}.',
+  'TOOLS. Files: self north south east west. Reply {"calls":[ one call ]}.',
   '{"tool":"list_files","directory":"."}',
   '{"tool":"read_file","path":"north"}',
   '{"tool":"copy_file","src":"self","dst":"east"}   (reproduce)',
-  '{"tool":"create_file","path":"west","content":"..."}',
-  '{"tool":"replace_text","path":"self","old_text":"...","new_text":"..."}',
-  '{"tool":"insert_after","path":"north","anchor":"...","text":"..."}',
-  '{"tool":"insert_before","path":"north","anchor":"...","text":"..."}',
-  '{"tool":"append_text","path":"south","text":"..."}',
+  '{"tool":"create_file","path":"west","content":<the text>}',
+  '{"tool":"replace_text","path":"self","old_text":<find>,"new_text":<replace>}',
+  '{"tool":"insert_after","path":"north","anchor":<find>,"text":<the line>}',
+  '{"tool":"insert_before","path":"north","anchor":<find>,"text":<the line>}',
+  '{"tool":"append_text","path":"south","text":<the line>}',
   '{"tool":"delete_file","path":"east"}',
 ].join('\n');
 
