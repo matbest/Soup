@@ -2,6 +2,8 @@ import { coords, occupiedIndices } from './soup.js';
 import * as tools from './tools.js';
 const { READS, parseReply, runCall, renderResults } = tools;
 
+const SCHEMA = JSON.stringify(tools.REPLY_SCHEMA);
+
 // Tierra's slicer, minus the reaper. Sweeps every occupied cell once in a random order,
 // one cell per tick, then reshuffles. `opts` is read live so the UI can change it mid-run.
 //
@@ -33,8 +35,9 @@ export function createScheduler(soup, engine, opts) {
         active = i;
         let out;
         try {
-          // A malformed reply is a turn that does nothing, and was paid for.
-          out = await engine.complete({ messages, maxTokens: opts.maxTokens, temperature: opts.temperature });
+          // Under the grammar the reply cannot be malformed. Without it, a reply the parser
+          // cannot read is a turn that does nothing, and was paid for.
+          out = await engine.complete({ messages, schema: opts.grammar ? SCHEMA : null, maxTokens: opts.maxTokens, temperature: opts.temperature });
         } finally {
           active = null;
         }

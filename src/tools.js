@@ -18,6 +18,44 @@ export const TOOL_NAMES = new Set([
 
 export const READS = new Set(['list_files', 'read_file']);
 
+// The same nine tools as a JSON schema. Handed to the model as a grammar (constrained
+// decoding), it cannot reply with anything else: small models describe what they would do
+// instead of doing it, and this is what stops them. The masking is CPU-side, so it costs
+// no GPU time. (It was removed once, blamed for "GrammarMatcher already deleted" errors
+// that turned out to be the Windows GPU watchdog resetting the card underneath it.)
+const str = { type: 'string' };
+const path = { enum: PATHS };
+const call = (tool, props, required) => ({
+  type: 'object',
+  properties: { tool: { enum: [tool] }, ...props },
+  required: ['tool', ...required],
+  additionalProperties: false,
+});
+
+export const CALL_SCHEMA = {
+  anyOf: [
+    call('list_files', { directory: str }, []),
+    call('read_file', { path }, ['path']),
+    call('copy_file', { src: path, dst: path }, ['src', 'dst']),
+    call('create_file', { path, content: str }, ['path', 'content']),
+    call('replace_text', { path, old_text: str, new_text: str }, ['path', 'old_text', 'new_text']),
+    call('insert_after', { path, anchor: str, text: str }, ['path', 'anchor', 'text']),
+    call('insert_before', { path, anchor: str, text: str }, ['path', 'anchor', 'text']),
+    call('append_text', { path, text: str }, ['path', 'text']),
+    call('delete_file', { path }, ['path']),
+  ],
+};
+
+export const REPLY_SCHEMA = {
+  type: 'object',
+  properties: {
+    thoughts: str,
+    calls: { type: 'array', items: CALL_SCHEMA, minItems: 1 },
+  },
+  required: ['calls'],
+  additionalProperties: false,
+};
+
 // Shown after every cell's text, verbatim. Two sizes, because prefill is one GPU dispatch
 // and its cost scales with prompt length: on a small card a long prompt can run past the
 // Windows watchdog limit and get the device reset. `short` is the same nine tools in a

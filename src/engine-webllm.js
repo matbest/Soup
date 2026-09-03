@@ -72,12 +72,15 @@ export function createWebLLMEngine(modelId, { onProgress } = {}) {
       try { await engine?.unload(); } catch { /* already gone */ }
       engine = null;
     },
-    async complete({ messages, maxTokens, temperature }) {
+    async complete({ messages, schema, maxTokens, temperature }) {
       const gaveUp = () => new Error(`${self.lost} Reload the page. If it recurs: update the GPU driver, try a smaller model, or raise the watchdog limit (TdrDelay).`);
       if (self.lost) throw gaveUp();
       let r;
       try {
-        r = await engine.chat.completions.create({ messages, max_tokens: maxTokens, temperature, top_p: 1 });
+        r = await engine.chat.completions.create({
+          response_format: schema ? { type: 'json_object', schema } : undefined,
+          messages, max_tokens: maxTokens, temperature, top_p: 1,
+        });
       } catch (err) {
         if (self.lost) throw gaveUp();
         throw err;
