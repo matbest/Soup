@@ -210,9 +210,16 @@ async function init() {
     o.textContent = `${m.id.replace(/-(Instruct-)?q\w+-MLC$/, '')}  ~${(m.vram / 1024).toFixed(1)} GB`;
     $('engine').insertBefore(o, mock);
   }
-  // ?engine=<model id or mock> overrides the default, for tests and for machines without a GPU to spare.
+  // ?engine=<model id or mock> overrides the default: for tests, for machines without a GPU
+  // to spare, and for trying any model WebLLM knows that is not in the picker.
   const wanted = new URL(location.href).searchParams.get('engine');
-  $('engine').value = wanted && [...$('engine').options].some(o => o.value === wanted) ? wanted : DEFAULT_MODEL;
+  if (wanted && ![...$('engine').options].some(o => o.value === wanted)) {
+    const o = document.createElement('option');
+    o.value = wanted;
+    o.textContent = wanted.replace(/-MLC$/, '');
+    $('engine').insertBefore(o, mock);
+  }
+  $('engine').value = wanted || DEFAULT_MODEL;
   $('ancestor').value = (await (await fetch('./ancestor.md')).text()).trim();
   $('manual').textContent = TOOLS;
   for (const b of document.querySelectorAll('nav [role=tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
