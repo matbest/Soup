@@ -8,7 +8,8 @@ export function createSoup(w, h) {
 }
 
 export function emptyCell() {
-  return { md: null, gen: 0, born: 0, turns: 0, fails: 0, last: null };
+  // The cursor is part of a cell's state, so where a lineage leaves it is inherited.
+  return { md: null, gen: 0, born: 0, turns: 0, fails: 0, last: null, cursor: { line: 0, col: 0 } };
 }
 
 export function wrap(soup, x, y) {
@@ -43,6 +44,7 @@ export function place(soup, x, y, md, { gen = 0 } = {}) {
   c.turns = 0;
   c.fails = 0;
   c.last = null;
+  c.cursor = { line: 0, col: 0 };
   return c;
 }
 

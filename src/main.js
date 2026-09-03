@@ -7,13 +7,14 @@ import { createWebLLMEngine, MODELS, DEFAULT_MODEL, describeAdapter } from './en
 import { createOpenRouterEngine, freeModels, storedKey, storeKey, PREFIX } from './engine-openrouter.js';
 import { createView } from './view.js';
 import { createViLab } from './vi-lab.js';
+import { viPrompt } from './vi-soup.js';
 import { estimateTokens } from './tokens.js';
 
 const $ = id => document.getElementById(id);
 
 // Copy noise is the mutation rate, and at zero there is no evolution: every copy is
 // exact, so nothing varies and nothing can be selected. It is on by default.
-const opts = { maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, ticksPerFrame: 20 };
+const opts = { mode: 'vi', maxTokens: 300, temperature: 0.7, noise: 0.002, rounds: 4, calls: 1, grammar: true, budget: 1200, readLimit: 600, keyLimit: 400, ticksPerFrame: 20 };
 let soup, engine, sched, running = false, busy = false;
 let inFlight = null;   // the turn currently awaiting the model, if any
 
@@ -94,8 +95,14 @@ function usageText(u) {
   return u ? `  (${u.prompt_tokens} in, ${u.completion_tokens} out)` : '';
 }
 
-// One line for what a turn did: its writes, and how many rounds it took.
+// One line for what a turn did: its writes, and what it cost.
 function describe(ev) {
+  if (ev.mode === 'vi') {
+    const writes = ev.effects.map(e =>
+      `${e.verb} (${e.dx},${e.dy})` + (e.copied ? ' [copy]' : '') + (e.mutated ? ' [mutated]' : '')
+    ).join(', ');
+    return `t${ev.tick}: ${writes || 'nothing'}, ${ev.keyCount} keys`;
+  }
   const rounds = `${ev.rounds.length} round${ev.rounds.length === 1 ? '' : 's'}`;
   if (!ev.effects.length) return `t${ev.tick}: no writes, ${rounds}`;
   const writes = ev.effects.map(e =>
@@ -105,8 +112,12 @@ function describe(ev) {
   return `t${ev.tick}: ${writes}, ${rounds}`;
 }
 
-// The whole turn, round by round: what the model said, and what the tools answered.
+// The whole turn: for vi, the keystrokes and what they did to the grid.
 function transcript(ev) {
+  if (ev.mode === 'vi') {
+    return `keys: ${ev.keys || '(none)'}\n\n${(ev.viLog || []).join('\n') || '(the keys did nothing)'}` +
+      `\n\n— the model's reply —\n${ev.rounds[0]?.out ?? ''}`;
+  }
   return ev.rounds.map((r, k) => {
     const results = r.results.map((res, j) => {
       const c = r.calls[j];
@@ -127,7 +138,7 @@ function showCell(i) {
   if (c.md === null) { clear(`(${x}, ${y}) empty`); return; }
   $('cell-head').textContent = `(${x}, ${y})  gen ${c.gen}  born t${c.born}  turns ${c.turns}  fails ${c.fails}  ${c.md.length} chars, about ${estimateTokens(c.md)} tokens`;
   $('genome').textContent = c.md;
-  $('prompt').textContent = prompt(c.md)[1].content;
+  $('prompt').textContent = (opts.mode === 'vi' ? viPrompt : prompt)(c.md)[1].content;
   const ev = c.last;
   $('output').textContent = ev ? describe(ev) + usageText(ev.usage) + '\n\n' + transcript(ev) : 'has not taken a turn yet';
 }
@@ -170,7 +181,7 @@ async function probe() {
     $('probe-v').textContent = `${n} write${n === 1 ? '' : 's'}, ${ev.rounds.length} round${ev.rounds.length === 1 ? '' : 's'}, ${secs}s`;
     $('cell-head').textContent = `probe${usageText(ev.usage)}  ${secs}s`;
     $('genome').textContent = md;
-    $('prompt').textContent = prompt(md)[1].content;
+    $('prompt').textContent = (opts.mode === 'vi' ? viPrompt : prompt)(md)[1].content;
     $('output').textContent = describe(ev) + '\n\n' + transcript(ev);
     showTab('cell');
   } finally {
@@ -281,7 +292,15 @@ async function init() {
     $('engine').insertBefore(o, mock);
   }
   $('engine').value = wanted || DEFAULT_MODEL;
-  $('ancestor').value = (await (await fetch('./ancestor.md')).text()).trim();
+  opts.mode = new URL(location.href).searchParams.get('mode') === 'tools' ? 'tools' : 'vi';
+  $('mode').value = opts.mode;
+  $('mode').addEventListener('change', async () => {
+    await stop();
+    opts.mode = $('mode').value;
+    await loadAncestor();
+    reset();
+  });
+  await loadAncestor();
   // Short TOOLS is the default: prefill is one GPU dispatch, and on a small card a long
   // prompt can run past the Windows watchdog and get the device reset. ?tools=full sends
   // the verbose block instead.
@@ -297,6 +316,7 @@ async function init() {
   bind('noise', 'noise');
   bind('rounds', 'rounds');
   bind('calls', 'calls');
+  bind('keyLimit', 'keyLimit');
   bind('budget', 'budget');
   $('grammar').checked = opts.grammar;
   $('grammar').addEventListener('change', () => { opts.grammar = $('grammar').checked; });
@@ -394,6 +414,13 @@ async function loadFreeModels() {
   }
 }
 
+// Each instruction set has its own ancestor: a JSON-tools cell and a vi cell are not
+// written in the same language.
+async function loadAncestor() {
+  const file = opts.mode === 'vi' ? './ancestor-vi.md' : './ancestor.md';
+  $('ancestor').value = (await (await fetch(file)).text()).trim();
+}
+
 // Everything a run knows, in one object: the grid, the settings, and the recent turns.
 // Saved to the dev server so a soup can be reloaded, read and worked on off the page.
 function dump() {
@@ -401,6 +428,7 @@ function dump() {
     saved: new Date().toISOString(),
     // Enough to know what produced this without asking: which model, on which device,
     // with which prompt and which settings.
+    mode: opts.mode,
     engine: engine.name,
     device: engine.gpu ?? null,
     tools: toolset.TOOLS.startsWith('TOOLS.') ? 'short' : 'full',

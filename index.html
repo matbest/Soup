@@ -92,6 +92,7 @@
           <button id="load">Load</button>
           <input id="loadfile" type="file" accept=".json" hidden>
         </div>
+        <label>instructions <select id="mode"><option value="vi">vi keystrokes</option><option value="tools">JSON tools</option></select><span></span></label>
         <label>engine <select id="engine"><optgroup label="openrouter (free)" id="or-group"></optgroup><option value="mock">mock</option></select><span></span></label>
         <label>grid <select id="size"><option>8</option><option selected>12</option><option>16</option><option>20</option><option>32</option></select><span></span></label>
         <label>ticks/frame <input id="tpf" type="range" min="1" max="200" value="20"><span id="tpf-v"></span></label>
@@ -102,6 +103,7 @@
         <label>slice (tokens) <input id="slice" type="range" min="10" max="800" step="10" value="300"><span id="slice-v"></span></label>
         <label>copy noise <input id="noise" type="range" min="0" max="0.02" step="0.0005" value="0.002"><span id="noise-v"></span></label>
         <label>rounds/turn <input id="rounds" type="range" min="1" max="6" value="4"><span id="rounds-v"></span></label>
+        <label>key limit <input id="keyLimit" type="range" min="20" max="1000" step="20" value="400"><span id="keyLimit-v"></span></label>
         <label>calls/round <input id="calls" type="range" min="1" max="6" value="1"><span id="calls-v"></span></label>
         <label>turn budget <input id="budget" type="range" min="400" max="4000" step="100" value="1200"><span id="budget-v"></span></label>
         <label>grammar <input id="grammar" type="checkbox" checked><span title="Constrained decoding: the reply can only be a valid tool call. Small models narrate instead of acting without it.">forces JSON</span></label>

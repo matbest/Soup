@@ -17,6 +17,20 @@ export function createMockEngine({ rng = Math.random, chatter = 0.02 } = {}) {
     async unload() {},
     async reset() {},
     async complete({ messages, maxTokens }) {
+      const promptText = messages[messages.length - 1].content;
+      // In vi mode it does what a real model asked for keystrokes would do at its best:
+      // find the keystrokes written in the cell's own text and echo them, with a chance
+      // of getting one character wrong.
+      if (/^VI\. Reply with vi keystrokes/m.test(promptText)) {
+        const genome = promptText.split(/^VI\./m)[0];
+        const found = genome.match(/^[a-zA-Z0-9<>$^{}\[\]]{4,40}$/m);
+        let keys = found ? found[0] : '';
+        if (keys && rng() < chatter * 5) {
+          const i = Math.floor(rng() * keys.length);
+          keys = keys.slice(0, i) + 'qzx'[Math.floor(rng() * 3)] + keys.slice(i + 1);
+        }
+        return keys;
+      }
       let reply;
       if (messages.length <= 2) {
         reply = { calls: [{ tool: 'list_files', directory: '.' }] };

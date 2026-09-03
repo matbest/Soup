@@ -1,6 +1,7 @@
 import { coords, occupiedIndices } from './soup.js';
 import { estimateTokens } from './tokens.js';
 import * as tools from './tools.js';
+import { viPrompt, viTurn, VI_HELP } from './vi-soup.js';
 const { READS, parseReply, runCall, renderResults } = tools;
 
 const schemaFor = (writeOnly, n) => JSON.stringify(writeOnly ? tools.writeSchema(n) : tools.replySchema(n));
@@ -29,9 +30,10 @@ export function createScheduler(soup, engine, opts) {
     }
     const cell = soup.cells[i];
     const [x, y] = coords(soup, i);
-    // Every turn starts in a fresh environment: the cell's own text and the tools, with
-    // nothing inherited from whichever cell ran last.
+    // Every turn starts in a fresh environment: the cell's own text and the instruction
+    // set, with nothing inherited from whichever cell ran last.
     await engine.reset?.();
+    if (opts.mode === 'vi') return viStep(i, cell, x, y);
     const messages = prompt(cell.md);
     const ev = { tick: 0, x, y, rounds: [], effects: [], usage: { prompt_tokens: 0, completion_tokens: 0 } };
     const last = Math.max(1, opts.rounds) - 1;
@@ -77,8 +79,35 @@ export function createScheduler(soup, engine, opts) {
     return ev;
   }
 
+  // A vi turn: one call, and whatever comes back is run as keystrokes over the grid.
+  async function viStep(i, cell, x, y) {
+    const messages = viPrompt(cell.md);
+    active = i;
+    let out;
+    try {
+      out = await engine.complete({ messages, maxTokens: opts.maxTokens, temperature: opts.temperature });
+    } finally {
+      active = null;
+    }
+    soup.tick++;
+    cell.turns++;
+    const r = viTurn(soup, x, y, out, { noise: opts.noise, keyLimit: opts.keyLimit ?? 400 });
+    if (!r.effects.length) cell.fails++;
+    const ev = {
+      tick: soup.tick, x, y, mode: 'vi', keys: r.keys, keyCount: r.keyCount,
+      effects: r.effects, viLog: r.log, usage: engine.lastUsage ?? null,
+      rounds: [{ out, calls: [], results: [], finish: engine.lastFinish ?? null }],
+    };
+    soup.cells[i].last = ev;
+    log.push(ev);
+    if (log.length > 500) log.shift();
+    return ev;
+  }
+
   return { step, log, get active() { return active; } };
 }
+
+export { VI_HELP, viPrompt };
 
 // What a cell's turn starts from: its own text, then the TOOLS. Nothing else.
 export function prompt(md) {

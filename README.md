@@ -221,6 +221,26 @@ Special keys are spelled in vim's own key notation (`:help key-notation`): `<Esc
 appends the same spelling, so what you type by hand and what a model writes are one
 language.
 
+### Wired into the soup
+
+Choose **instructions: vi keystrokes** on the run tab (the default on this branch; add
+`?mode=tools` for the JSON toolset). A turn is then one call: the cell's text goes to the
+model with a short key reference, and the reply is run as keystrokes over the grid,
+starting in that cell. There is no looking around first and no protocol — the reply is the
+program. Writing is lossy at the copy-noise rate, so variation enters wherever text is
+written.
+
+The ancestor (`ancestor-vi.md`) is a text whose job is to make the model emit
+`ggyGLggVGp`. That is the whole experiment: a cell's text is not data the model reads
+about, it is the thing that has to induce a working program. A wording that reliably
+produces those keys spreads; one that produces something close but wrong does not.
+
+Two dynamics show up within a few hundred ticks. A genome that only goes east fills one
+row of the torus and stops, so the soup selects for variation in direction. And the texts
+grow: paste-over leaves several copies of the instruction in a cell, which makes the
+keystrokes easier for the model to find — a more robust representation of the same
+program, arrived at by selection rather than design.
+
 The **vi** tab is a bench for trying it by hand: a window of the grid around the cursor,
 the keystroke stream shown key by key (click any key to run up to that point), Step and
 Back, presets, and a box to type straight in. *Apply as new start* takes the result as the
