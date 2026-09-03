@@ -283,6 +283,12 @@ function renderPrompt(text) {
       (engine?.scale && engine.scale !== 1 ? `  window at ${engine.scale.toFixed(2)}x the estimate` : '');
 }
 
+// Controls that belong to one instruction set only are hidden under the other, rather
+// than sitting there doing nothing.
+function showForMode() {
+  for (const el of document.querySelectorAll('[data-only]')) el.hidden = el.dataset.only !== opts.mode;
+}
+
 function showTab(name) {
   for (const b of document.querySelectorAll('nav [role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
   for (const p of document.querySelectorAll('.panel')) p.hidden = p.dataset.panel !== name;
@@ -484,9 +490,11 @@ async function init() {
   // the browser will not give the GPU back at all — which is what a person does by hand.
   opts.autoReload = new URL(location.href).searchParams.get('resume') === '1';
   $('mode').value = opts.mode;
+  showForMode();
   $('mode').addEventListener('change', async () => {
     await stop();
     opts.mode = $('mode').value;
+    showForMode();
     await loadAncestor();
     reset();
   });
