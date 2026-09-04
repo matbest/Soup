@@ -274,7 +274,13 @@ second. Dropping the slice to 60 tokens shortens decode too. Neither changes the
 experiment: it is the same keystrokes and the same instruction set, with less prose around
 them.
 
-The real fix, if you want the larger models, is to raise the watchdog: a `TdrDelay` DWORD
+`tools/GPU watchdog.cmd` puts a switch in the notification area for it: it shows what the
+watchdog is set to, offers ten seconds or the Windows default, and explains the trade in
+its own words. Reading the setting needs nothing; changing it asks for administrator
+rights each time and takes effect at the next restart. It never touches `TdrLevel`, which
+is what would stop Windows recovering a hung GPU at all.
+
+The same thing by hand, if you would rather: a `TdrDelay` DWORD
 of 10 under `HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers`, and a reboot. That
 is a system-wide graphics setting, so it is not something this repo does for you.
 
