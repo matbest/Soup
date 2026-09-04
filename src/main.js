@@ -345,6 +345,11 @@ function breathe(workedMs) {
   return share > 0 && workedMs > 0 ? new Promise(r => setTimeout(r, workedMs * share)) : Promise.resolve();
 }
 
+// A run that recovers and then works for a while has earned its reload credits back.
+// Without this an overnight run spends all five on one bad patch and stops for good.
+const GOOD_ENOUGH = 25;
+let goodTurns = 0;
+
 async function loop() {
   while (running) {
     let sweptFor = 0;
@@ -381,6 +386,7 @@ async function loop() {
       }
       if (!ev) { running = false; $('status').textContent = 'soup is dead'; break; }
       sweptFor += performance.now() - startedAt;
+      if (++goodTurns >= GOOD_ENOUGH) { goodTurns = 0; sessionStorage.removeItem(RELOADS); recoveries = 0; }
     }
     view.draw();
     showStats();
@@ -425,6 +431,7 @@ async function reloadAndResume() {
   const n = Number(sessionStorage.getItem(RELOADS) || 0);
   if (!opts.autoReload || n >= 5 || saveBroken) return false;
   sessionStorage.setItem(RELOADS, String(n + 1));
+  goodTurns = 0;
   sessionStorage.setItem(RESUMING, '1');
   $('status').textContent = 'the GPU is gone; saving and reloading to carry on';
   await save();
